@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短期通行許可憑證 - 發行端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="page-container">
+        <div class="content-card">
+            <div class="mb-4">
+                <a href="/" class="btn btn-outline-secondary btn-sm">← 返回首頁</a>
+            </div>
+
+            <h2 class="text-center mb-4">短期通行許可憑證發行系統</h2>
+            
+            <div class="step-indicator">
+                <div class="step active" id="step1">
+                    <div>步驟 1</div>
+                    <small>虛擬身分證資料</small>
+                </div>
+                <div class="step" id="step2">
+                    <div>步驟 2</div>
+                    <small>通行資訊設定</small>
+                </div>
+                <div class="step" id="step3">
+                    <div>步驟 3</div>
+                    <small>產生憑證</small>
+                </div>
+            </div>
+
+            <!-- ===== 步驟 1: 虛擬身分證資料輸入 ===== -->
+            <div id="section1" class="section-content">
+                <h4 class="mb-4">步驟 1：虛擬身分證資料</h4>
+                
+                <div class="alert alert-info">
+                    <strong>📋 說明：</strong>此為模擬虛擬身分證掃描結果。實際應用中，監管人員將透過掃描使用者的虛擬身分證 QR Code 來取得以下資訊。目前我們將資料預先填入以便演示。
+                </div>
+
+                <form id="idForm">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">姓名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" 
+                               value="王小明" required
+                               placeholder="請輸入姓名">
+                        <small class="text-muted">只能輸入中英文、數字和底線</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="roc_birthday" class="form-label">民國出生年月日 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="roc_birthday" 
+                               value="0900101" required
+                               placeholder="例：0900101（民國90年1月1日）"
+                               maxlength="7"
+                               pattern="\d{7}">
+                        <small class="text-muted">民國年份 + 月份 + 日期，共7碼（例：民國90年1月1日 = 0900101）</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_number" class="form-label">國民身分證統一編號 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="id_number" 
+                               value="A123456789" required
+                               placeholder="例：A123456789"
+                               maxlength="10"
+                               pattern="[A-Z]\d{9}">
+                        <small class="text-muted">台灣身分證字號格式：1個大寫英文字母 + 9個數字</small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="goToStep(2)">
+                            下一步 →
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ===== 步驟 2: 通行資訊設定 ===== -->
+            <div id="section2" class="section-content" style="display: none;">
+                <h4 class="mb-4">步驟 2：通行資訊設定</h4>
+                
+                <div class="alert alert-info">
+                    <strong>📋 說明：</strong>監管人員需要將使用者的虛擬身分證資料導入門禁系統，系統會產生通行編號並建立白名單。請在此輸入相關資訊。
+                </div>
+
+                <form id="accessForm">
+                    <div class="mb-3">
+                        <label for="pass_status" class="form-label">通行身份 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="pass_status" required>
+                            <option value="">-- 請選擇 --</option>
+                            <option value="訪客" selected>訪客</option>
+                            <option value="廠商">廠商</option>
+                            <option value="臨時人員">臨時人員</option>
+                            <option value="維修人員">維修人員</option>
+                            <option value="合作廠商">合作廠商</option>
+                        </select>
+                        <small class="text-muted">請選擇該訪客的通行身份</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="pass_id" class="form-label">通行編號 <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="pass_id" 
+                                   placeholder="例：ACC20241030001" required
+                                   pattern="[A-Za-z0-9]+">
+                            <button class="btn btn-outline-secondary" type="button" onclick="generatePassId()">
+                                自動產生
+                            </button>
+                        </div>
+                        <small class="text-muted">允許大寫字母、小寫字母和數字。點擊「自動產生」按鈕產生唯一編號。</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="validity" class="form-label">有效期限（天數）<span class="text-danger">*</span></label>
+                        <select class="form-select" id="validity" required>
+                            <option value="1">1天</option>
+                            <option value="3" selected>3天</option>
+                            <option value="7">7天</option>
+                            <option value="14">14天</option>
+                            <option value="30">30天</option>
+                        </select>
+                        <small class="text-muted">選擇該憑證的有效期限</small>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex gap-md-2 justify-content-md-between">
+                        <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
+                            ← 上一步
+                        </button>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="goToStep(3)" style="flex: 1;">
+                            下一步 →
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ===== 步驟 3: 產生憑證 ===== -->
+            <div id="section3" class="section-content" style="display: none;">
+                <h4 class="mb-4">步驟 3：產生訪客證</h4>
+                
+                <div class="alert alert-info">
+                    <strong>✓ 確認資訊：</strong>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>姓名：</strong><span id="summary_name"></span></p>
+                                <p><strong>身分證字號：</strong><span id="summary_id_number"></span></p>
+                                <p><strong>出生年月日：</strong><span id="summary_birthday"></span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>通行身份：</strong><span id="summary_pass_status"></span></p>
+                                <p><strong>通行編號：</strong><span id="summary_pass_id"></span></p>
+                                <p><strong>有效期限：</strong><span id="summary_validity"></span>天</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mb-4">
+                    <button type="button" class="btn btn-success btn-lg" onclick="issueCredential()" id="issueBtn">
+                        產生訪客證 QR Code
+                    </button>
+                </div>
+
+                <!-- QR Code 顯示區域 -->
+                <div id="qrcodeContainer" style="display: none;">
+                    <div class="qr-display">
+                        <div id="qrcode"></div>
+                    </div>
+                    <div class="result-box result-success">
+                        <h5 class="mb-3">✓ 憑證發行成功！</h5>
+                        <p>請使用<strong>數位憑證皮夾 APP</strong>掃描上方 QR Code 來取得短期通行許可憑證。</p>
+                        <hr>
+                        <p class="mb-0">
+                            <strong>通行編號：</strong><span id="displayPassId" class="text-monospace"></span><br>
+                            <strong>發行時間：</strong><span id="displayIssueTime"></span><br>
+                            <strong>VC UID：</strong><span id="displayVcUid" class="text-monospace small"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 錯誤訊息顯示區域 -->
+                <div id="errorContainer" style="display: none;">
+                    <div class="result-box result-failed">
+                        <h5>✗ 發行失敗</h5>
+                        <p id="errorMessage"></p>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex gap-md-2 justify-content-md-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goToStep(2)" id="prevBtn">
+                        ← 上一步
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" onclick="resetForm()">
+                        重新開始
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 白名單管理區 -->
+        <div class="content-card mt-4">
+            <h5 class="mb-3">白名單管理</h5>
+            <p class="text-muted">已發行的憑證會自動加入白名單，供門禁驗證時比對使用。</p>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>通行編號</th>
+                            <th>姓名</th>
+                            <th>通行身份</th>
+                            <th>發行時間</th>
+                            <th>狀態</th>
+                        </tr>
+                    </thead>
+                    <tbody id="whitelistTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">目前尚無發行紀錄</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入 QRCode.js 庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- 引入公共 JavaScript -->
+    <script src="/js/common.js"></script>
+    <!-- 引入發行端 JavaScript -->
+    <script src="/js/issuer.js"></script>
+</body>
+</html>

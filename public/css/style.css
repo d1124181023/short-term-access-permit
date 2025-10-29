@@ -1,0 +1,180 @@
+/* 全域樣式 */
+body {
+    font-family: 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+/* 首頁樣式 */
+.hero-section {
+    padding: 40px 20px;
+}
+
+.feature-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+
+.hover-card {
+    transition: transform 0.3s, box-shadow 0.3s;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.hover-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* 內頁容器樣式 */
+.page-container {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.content-card {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 步驟指示器 */
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    gap: 10px;
+}
+
+.step {
+    flex: 1;
+    text-align: center;
+    padding: 15px 10px;
+    background: #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6c757d;
+    transition: all 0.3s;
+}
+
+.step.active {
+    background: #0d6efd;
+    color: white;
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+/* QR Code 顯示區域 */
+.qr-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+    min-height: 300px;
+}
+
+.qr-display img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 結果顯示框 */
+.result-box {
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.result-success {
+    background: #d1e7dd;
+    border: 2px solid #0f5132;
+    color: #0f5132;
+}
+
+.result-failed {
+    background: #f8d7da;
+    border: 2px solid #842029;
+    color: #842029;
+}
+
+.result-warning {
+    background: #fff3cd;
+    border: 2px solid #997404;
+    color: #997404;
+}
+
+/* 載入動畫 */
+.spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: #0d6efd;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 按鈕樣式 */
+.btn-lg {
+    padding: 12px 32px;
+    font-size: 18px;
+    border-radius: 8px;
+}
+
+/* 表單樣式 */
+.form-control, .form-select {
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    padding: 10px 12px;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* 警告訊息 */
+.alert {
+    border-radius: 8px;
+    border: none;
+}
+
+/* 表格樣式 */
+.table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table thead {
+    background: #f8f9fa;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .step {
+        font-size: 12px;
+        padding: 10px 5px;
+    }
+    
+    .content-card {
+        padding: 20px;
+    }
+    
+    .feature-icon {
+        font-size: 48px;
+    }
+}
