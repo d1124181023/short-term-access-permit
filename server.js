@@ -14,6 +14,48 @@ app.use(cors()); // 允許跨域請求
 app.use(express.json()); // 解析 JSON 格式的請求
 app.use(express.static('public')); // 提供靜態檔案（HTML/CSS/JS）
 
+const fs = require('fs');
+const path = require('path');
+
+// ============================================
+// 白名單持久化配置
+// ============================================
+const WHITELIST_FILE = path.join(__dirname, 'whitelist.json');
+
+/**
+ * 從檔案載入白名單
+ */
+function loadWhitelistFromFile() {
+    try {
+        if (fs.existsSync(WHITELIST_FILE)) {
+            const data = fs.readFileSync(WHITELIST_FILE, 'utf8');
+            const parsed = JSON.parse(data);
+            console.log('✓ 從檔案載入白名單，共', parsed.length, '筆');
+            return parsed;
+        }
+    } catch (error) {
+        console.error('❌ 讀取白名單檔案失敗:', error);
+    }
+    return [];
+}
+
+/**
+ * 儲存白名單到檔案
+ */
+function saveWhitelistToFile(data) {
+    try {
+        fs.writeFileSync(WHITELIST_FILE, JSON.stringify(data, null, 2));
+        console.log('✓ 白名單已儲存到檔案，共', data.length, '筆');
+    } catch (error) {
+        console.error('❌ 儲存白名單失敗:', error);
+    }
+}
+
+// ============================================
+// 白名單管理（內存版本 + 檔案備份）
+// ============================================
+let whitelist = loadWhitelistFromFile();  // ← 改成從檔案載入
+
 // ============================================
 // API 路由：發行憑證
 // ============================================
@@ -369,7 +411,7 @@ app.get('/api/verification-result/:transactionId', async (req, res) => {
 // ============================================
 // 白名單管理（內存版本）
 // ============================================
-let whitelist = [];
+// let whitelist = [];
 
 /**
  * 清理過期的白名單項目
@@ -386,9 +428,11 @@ function cleanupExpiredWhitelist() {
     
     const removedCount = initialCount - whitelist.length;
     if (removedCount > 0) {
+        saveWhitelistToFile(whitelist);  // ← 新增這一行
         console.log(`✓ 已清理 ${removedCount} 筆過期白名單項目`);
     }
 }
+
 
 // 在伺服器啟動時立即執行一次
 cleanupExpiredWhitelist();
@@ -397,7 +441,7 @@ cleanupExpiredWhitelist();
 setInterval(cleanupExpiredWhitelist, 60 * 60 * 1000);
 
 // ============================================
-// 新增白名單 API
+// API 路由：新增白名單
 // ============================================
 app.post('/api/whitelist', (req, res) => {
     const entry = {
@@ -406,15 +450,18 @@ app.post('/api/whitelist', (req, res) => {
         name: req.body.name,
         pass_status: req.body.pass_status,
         created_at: new Date().toISOString(),
-        expiry_date: req.body.expiry_date,  // ← 新增：記錄到期日期
+        issue_time: req.body.issue_time || new Date().toLocaleString('zh-TW'),
+        expiry_date: req.body.expiry_date,
         status: 'active'
     };
     
     whitelist.push(entry);
+    saveWhitelistToFile(whitelist);  // ← 新增這一行
     console.log('新增白名單:', entry);
     
     res.json({ success: true, data: entry });
 });
+
 
 // ============================================
 // 查詢白名單 API
@@ -517,6 +564,47 @@ app.post('/api/verify-whitelist', (req, res) => {
         data: entry
     });
 });
+
+// ============================================
+// API 路由：取消白名單項目的權限
+// ============================================
+app.delete('/api/whitelist/:id', (req, res) => {
+    const { id } = req.params;
+    
+    console.log('取消白名單項目:', id);
+    
+    const index = whitelist.findIndex(item => item.id == id);
+    
+    if (index === -1) {
+        return res.json({
+            success: false,
+            message: '找不到該白名單項目'
+        });
+    }
+    
+    const removedEntry = whitelist[index];
+    whitelist.splice(index, 1);
+    saveWhitelistToFile(whitelist);  // ← 新增這一行
+    
+    console.log(`✓ 已移除: ${removedEntry.name} (${removedEntry.pass_id})`);
+    
+    res.json({
+        success: true,
+        message: `已取消 ${removedEntry.name} 的通行權限`,
+        data: removedEntry
+    });
+});
+
+// ============================================
+// API 路由：查詢白名單
+// ============================================
+app.get('/api/whitelist', (req, res) => {
+    // 查詢前先清理過期項目
+    cleanupExpiredWhitelist();
+    res.json({ success: true, data: whitelist });
+});
+
+
 
 // ============================================
 // 啟動伺服器

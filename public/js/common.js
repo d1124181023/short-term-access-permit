@@ -4,7 +4,7 @@
 
 /**
  * 發送 API 請求的通用函數
- * @param {string} method - HTTP 方法 (GET, POST, etc.)
+ * @param {string} method - HTTP 方法 (GET, POST, DELETE, etc.)
  * @param {string} endpoint - API 端點
  * @param {object} data - 請求資料（可選）
  * @returns {Promise} API 回應

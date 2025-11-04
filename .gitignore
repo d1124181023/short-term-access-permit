@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# 白名單資料檔案
+whitelist.json
+
+# 環境變數
+.env
+
+# Node modules
+node_modules/
+
