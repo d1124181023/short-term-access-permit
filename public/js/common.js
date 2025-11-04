@@ -279,6 +279,29 @@ function showError(message) {
 }
 
 /**
+ * 產生 UUID v4 格式的交易序號
+ * @returns {string} UUID v4 格式（36 字元）
+ */
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+/**
+ * 驗證交易序號格式
+ * @param {string} transactionId - 交易序號
+ * @returns {boolean}
+ */
+function validateTransactionId(transactionId) {
+    // UUID v4 正規表達式
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(transactionId);
+}
+
+/**
  * 設定按鈕的載入狀態
  * @param {string} buttonId - 按鈕的 ID
  * @param {boolean} isLoading - 是否正在載入

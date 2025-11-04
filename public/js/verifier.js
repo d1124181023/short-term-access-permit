@@ -22,16 +22,17 @@ async function generateVerificationQR() {
     setButtonLoading('generateBtn', true, '產生驗證 QR Code');
 
     try {
-        // 呼叫後端 API 產生驗證 QR Code
         const response = await apiCall('POST', '/api/generate-verification-qr', {});
+
+        console.log('【API 回應】:', response);  // ← 偵錯點 1
+        console.log('【qrCode 內容長度】:', response.qrCode?.length);  // ← 偵錯點 2
 
         if (!response.success) {
             throw new Error(response.message || '產生驗證 QR Code 失敗');
         }
 
-        console.log('驗證 QR Code 產生成功:', response);
-
-        verificationSession = response.sessionId;
+        verificationSession = response.transactionId;
+        console.log('【交易序號】:', verificationSession);  // ← 偵錯點 3
 
         // 顯示 QR Code 容器和等待提示
         document.getElementById('qrcodeContainer').style.display = 'flex';
@@ -40,25 +41,31 @@ async function generateVerificationQR() {
         document.getElementById('retryButtonBox').style.display = 'none';
         document.getElementById('generateBtn').style.display = 'none';
 
-        // 產生 QR Code（使用回應的 QR Code 資料）
-        const canvas = document.getElementById('qrCanvas');
-        canvas.width = 0; // 重置 canvas
-        canvas.height = 0;
+        // 直接使用 API 回傳的 base64 QR Code 圖片
+        const qrcodeDiv = document.getElementById('qrcode');
+        console.log('【qrcodeDiv 元素】:', qrcodeDiv);  // ← 偵錯點 4
 
-        QRCode.toCanvas(canvas, response.qrCodeUrl || JSON.stringify({
-            sessionId: response.sessionId,
-            timestamp: new Date().toISOString()
-        }), {
-            width: 256,
-            errorCorrectionLevel: 'H'
-        }, (error) => {
-            if (error) {
-                console.error('QR Code 產生失敗:', error);
-                showError('QR Code 產生失敗');
-            }
-        });
+        if (!qrcodeDiv) {
+            throw new Error('QR Code 容器不存在');
+        }
 
-        // 開始輪詢驗證結果
+        qrcodeDiv.innerHTML = '';
+        console.log('【已清空 qrcodeDiv】');  // ← 偵錯點 5
+
+        const img = document.createElement('img');
+        img.src = response.qrCode;
+        img.width = 256;
+        img.height = 256;
+        img.alt = '驗證 QR Code';
+        img.style.borderRadius = '8px';
+        img.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        
+        console.log('【img 物件】:', img);  // ← 偵錯點 6
+        console.log('【img.src 內容】:', img.src.substring(0, 50) + '...');  // ← 偵錯點 7
+        
+        qrcodeDiv.appendChild(img);
+        console.log('【已新增 img 到 qrcodeDiv】');  // ← 偵錯點 8
+
         startPolling();
 
     } catch (error) {
@@ -70,6 +77,8 @@ async function generateVerificationQR() {
         setButtonLoading('generateBtn', false, '產生驗證 QR Code');
     }
 }
+
+
 
 /**
  * 開始輪詢驗證結果
@@ -85,24 +94,38 @@ function startPolling() {
         try {
             const response = await apiCall('GET', `/api/verification-result/${verificationSession}`);
 
-            console.log('驗證結果:', response);
+            console.log('【輪詢回應】:', response);
 
-            if (response.status === 'completed') {
-                // 驗證完成
+            // ✓ 驗證完成（成功）
+            if (response.status === 'completed' && response.data) {
+                console.log('✓ 驗證已完成');
                 stopPolling();
                 handleVerificationResult(response);
-            } else if (response.status === 'failed') {
-                // 驗證失敗
-                stopPolling();
-                handleVerificationResult(response);
+                return;  // ← 重要：停止進一步的處理
             }
+
+            // ✗ 驗證失敗
+            if (response.status === 'failed') {
+                console.log('✗ 驗證失敗');
+                stopPolling();
+                handleVerificationResult(response);
+                return;  // ← 重要：停止進一步的處理
+            }
+
+            // ⏳ 仍在等待
+            if (response.status === 'pending') {
+                console.log('⏳ 仍在等待...');
+                return;  // ← 繼續輪詢
+            }
+
         } catch (error) {
-            console.warn('查詢驗證結果失敗:', error);
-            // 繼續輪詢
+            console.warn(`輪詢第 ${attemptCount} 次失敗:`, error);
+            // 繼續輪詢，除非超時
         }
 
-        // 超時處理
+        // ⏱️ 超時處理
         if (attemptCount >= maxAttempts) {
+            console.log('⏱️ 驗證逾時');
             stopPolling();
             showTimeoutMessage();
         }
@@ -116,8 +139,10 @@ function stopPolling() {
     if (pollingInterval) {
         clearInterval(pollingInterval);
         pollingInterval = null;
+        console.log('✓ 已停止輪詢');
     }
 }
+
 
 /**
  * 處理驗證結果
@@ -130,22 +155,88 @@ async function handleVerificationResult(result) {
     document.getElementById('resultBox').style.display = 'block';
 
     if (result.status === 'completed' && result.data) {
-        // 驗證憑證成功，比對白名單
-        const whitelistCheck = await verifyAgainstWhitelist(result.data);
-
-        if (whitelistCheck.success) {
-            displaySuccessResult(result.data);
-        } else {
-            displayFailedResult(whitelistCheck.message);
-        }
-    } else {
+        // 驗證成功
+        displaySuccessResult(result.data);
+    } else if (result.status === 'failed') {
         // 驗證失敗
-        displayFailedResult(result.message || '憑證驗證失敗');
+        displayFailedResult(result.message || '驗證失敗');
+    } else {
+        // 其他情況
+        console.warn('未知的驗證結果:', result);
     }
 
     // 顯示重新開始按鈕
     document.getElementById('retryButtonBox').style.display = 'block';
 }
+
+/**
+ * 顯示驗證成功結果
+ */
+function displaySuccessResult(data) {
+    console.log('顯示成功結果:', data);
+    
+    // 隱藏其他結果框
+    document.getElementById('failedResult').style.display = 'none';
+    document.getElementById('timeoutResult').style.display = 'none';
+    document.getElementById('successResult').style.display = 'block';
+
+    // 填入驗證資訊
+    document.getElementById('resultName').textContent = data.name || 'N/A';
+    document.getElementById('resultPassStatus').textContent = data.pass_status || 'N/A';
+    document.getElementById('resultPassId').textContent = data.pass_id || 'N/A';
+    document.getElementById('resultTime').textContent = formatDateTime();
+
+    // 新增驗證紀錄
+    const log = {
+        timestamp: formatDateTime(),
+        name: data.name,
+        pass_id: data.pass_id,
+        pass_status: data.pass_status,
+        result: 'SUCCESS'
+    };
+
+    verificationLogs.unshift(log);
+    if (verificationLogs.length > 10) {
+        verificationLogs.pop();
+    }
+
+    saveToStorage('verificationLogs', verificationLogs);
+    updateVerificationLogsDisplay();
+
+    showSuccess('✓ 驗證通過 - 允許通行');
+}
+
+/**
+ * 顯示驗證失敗結果
+ */
+function displayFailedResult(message) {
+    console.log('顯示失敗結果:', message);
+    
+    // 隱藏其他結果框
+    document.getElementById('successResult').style.display = 'none';
+    document.getElementById('timeoutResult').style.display = 'none';
+    document.getElementById('failedResult').style.display = 'block';
+
+    document.getElementById('failedMessage').textContent = message;
+
+    // 新增驗證紀錄
+    const log = {
+        timestamp: formatDateTime(),
+        result: 'FAILED',
+        message: message
+    };
+
+    verificationLogs.unshift(log);
+    if (verificationLogs.length > 10) {
+        verificationLogs.pop();
+    }
+
+    saveToStorage('verificationLogs', verificationLogs);
+    updateVerificationLogsDisplay();
+
+    showError('✗ 驗證失敗 - 拒絕通行');
+}
+
 
 /**
  * 比對白名單
@@ -298,6 +389,7 @@ function loadWhitelist() {
             if (response.success && response.data) {
                 whitelistData = response.data;
                 updateWhitelistTable();
+                console.log('✓ 白名單已載入:', whitelistData);
             }
         })
         .catch(error => {
@@ -306,7 +398,7 @@ function loadWhitelist() {
 }
 
 /**
- * 更新白名單表格
+ * 更新白名單表格顯示
  */
 function updateWhitelistTable() {
     const tbody = document.getElementById('whitelistTableBody');

@@ -110,29 +110,32 @@ app.post('/api/issue-credential', async (req, res) => {
 
 
 // ============================================
+// 儲存交易序號對應的 QR Code 資訊（簡易版）
+// ============================================
+let verificationSessions = {}; // { transactionId: { qrCodeUrl, ref, createdAt, ... } }
+
+// ============================================
 // API 路由：產生驗證 QR Code
 // ============================================
 app.post('/api/generate-verification-qr', async (req, res) => {
     try {
         console.log('產生驗證 QR Code');
 
-        // 準備驗證資料
-        const verifierPayload = {
-            vpUid: process.env.VP_CODE + '_' + Date.now(),
-            ref: process.env.VP_REF
-        };
+        const transactionId = generateTransactionId();
+        const ref = process.env.VP_REF;
 
-        // 呼叫驗證端 API
-        const apiUrl = `${process.env.VERIFIER_API_URL}/api/qrcode/data`;
-        
+        console.log('交易序號:', transactionId);
+        console.log('VP_REF:', ref);
+
+        const apiUrl = `${process.env.VERIFIER_API_URL}/api/oidvp/qrcode?ref=${ref}&transactionId=${transactionId}`;
+        console.log('驗證端 API URL:', apiUrl);
+
         const response = await fetch(apiUrl, {
-            method: 'POST',
+            method: 'GET',
             headers: {
-                'Access-Token': process.env.VERIFIER_ACCESS_TOKEN,  // 使用 Access-Token header
-                'Content-Type': 'application/json',
+                'Access-Token': process.env.VERIFIER_ACCESS_TOKEN,
                 'accept': 'application/json'
-            },
-            body: JSON.stringify(verifierPayload)
+            }
         });
 
         console.log('驗證端回應狀態碼:', response.status);
@@ -144,15 +147,32 @@ app.post('/api/generate-verification-qr', async (req, res) => {
         }
 
         const result = await response.json();
-        console.log('驗證端回應:', result);
+        console.log('【沙盒系統完整回應】:', JSON.stringify(result, null, 2));  // ← 關鍵偵錯
+        console.log('【回應中所有 key】:', Object.keys(result));  // ← 看看有哪些欄位
 
-        // 取得 QR Code ID
-        const qrcodeId = response.headers.get('location')?.split('/').pop() || result.qrcodeId;
+        // 儲存此次驗證會話資訊
+        verificationSessions[transactionId] = {
+            transactionId: transactionId,
+            ref: ref,
+            createdAt: new Date().toISOString(),
+            status: 'pending',
+            qrCodeData: result  // ← 儲存原始回應
+        };
 
+        // 根據實際回應決定要傳回什麼
+        let qrCodeValue = result.qrCode;  // 可能是這個
+        if (!qrCodeValue && result.qrcode) qrCodeValue = result.qrcode;  // 或是這個
+        if (!qrCodeValue && result.qrcodeImage) qrCodeValue = result.qrcodeImage;  // 或是這個
+        if (!qrCodeValue && result.imageData) qrCodeValue = result.imageData;  // 或是這個
+
+        console.log('【最終使用的 QR Code 值】:', qrCodeValue ? '存在' : '不存在');
+
+        // 回傳結果
         res.json({
             success: true,
-            qrCodeUrl: `${process.env.VERIFIER_API_URL}/api/qrcode/${qrcodeId}`,
-            sessionId: qrcodeId,
+            qrCode: qrCodeValue,  // ← 這個欄位現在應該有值了
+            transactionId: transactionId,
+            ref: ref,
             message: '驗證 QR Code 產生成功'
         });
 
@@ -167,37 +187,171 @@ app.post('/api/generate-verification-qr', async (req, res) => {
 
 
 // ============================================
+// 工具函數：生成交易序號
+// ============================================
+function generateTransactionId() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+
+
+// ============================================
 // API 路由：查詢驗證結果
 // ============================================
-app.get('/api/verification-result/:sessionId', async (req, res) => {
+app.get('/api/verification-result/:transactionId', async (req, res) => {
     try {
-        const { sessionId } = req.params;
+        const { transactionId } = req.params;
         
-        console.log('查詢驗證結果:', sessionId);
+        console.log('查詢驗證結果:', transactionId);
 
-        // 呼叫驗證端 API 查詢結果
-        const response = await fetch(
-            `${process.env.VERIFIER_API_URL}/api/vp/result/${sessionId}`,
-            {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${process.env.VERIFIER_ACCESS_TOKEN}`
-                }
+        const apiUrl = `${process.env.VERIFIER_API_URL}/api/oidvp/result?transactionId=${transactionId}`;
+        console.log('查詢 API URL:', apiUrl);
+
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Access-Token': process.env.VERIFIER_ACCESS_TOKEN,
+                'accept': 'application/json'
             }
-        );
+        });
+
+        console.log('驗證端回應狀態碼:', response.status);
 
         if (!response.ok) {
-            throw new Error(`驗證端 API 錯誤: ${response.status}`);
+            const errorText = await response.text();
+            console.error('驗證端錯誤回應:', errorText);
+            
+            if (response.status === 204) {
+                return res.json({
+                    success: false,
+                    status: 'pending',
+                    message: '等待使用者掃描'
+                });
+            }
+            
+            throw new Error(`驗證端 API 錯誤: ${response.status} - ${errorText}`);
         }
 
         const result = await response.json();
-        console.log('驗證結果:', result);
+        console.log('【驗證端回應結果】:', JSON.stringify(result, null, 2));
 
+        // 檢查驗證是否成功
+        if (result.verifyResult === true || result.resultDescription === 'success') {
+            console.log('✓ 驗證成功！');
+            
+            // 提取憑證資料
+            if (result.data && result.data.length > 0) {
+                const credentialData = result.data[0];
+                const claims = credentialData.claims || [];
+                
+                console.log('【提取的 claims】:', claims);
+                
+                // 將 claims 陣列轉換為物件
+                const claimsObj = {};
+                claims.forEach(claim => {
+                    claimsObj[claim.ename] = claim.value;
+                });
+                
+                console.log('【轉換後的 claims 物件】:', claimsObj);
+
+                // === 【關鍵】與白名單比對 ===
+                console.log('【準備與白名單比對】');
+                console.log('【目前白名單】:', whitelist);
+
+                const pass_id = claimsObj.pass_id;
+                const name = claimsObj.name;
+                const pass_status = claimsObj.pass_status;
+
+                // 檢查白名單中是否存在此通行編號
+                const whitelistEntry = whitelist.find(item => 
+                    item.pass_id === pass_id && 
+                    item.status === 'active'
+                );
+
+                if (!whitelistEntry) {
+                    console.log('❌ 通行編號不在白名單中:', pass_id);
+                    return res.json({
+                        success: true,
+                        status: 'failed',
+                        verifyResult: false,
+                        message: '通行編號不在白名單中'
+                    });
+                }
+
+                // 檢查是否已過期
+                const expiryDate = new Date(whitelistEntry.expiry_date);
+                if (expiryDate < new Date()) {
+                    console.log('❌ 憑證已過期');
+                    return res.json({
+                        success: true,
+                        status: 'failed',
+                        verifyResult: false,
+                        message: '憑證已過期'
+                    });
+                }
+
+                // 檢查姓名是否相符
+                if (whitelistEntry.name !== name) {
+                    console.log('❌ 姓名不符:', '白名單=', whitelistEntry.name, '掃描=', name);
+                    return res.json({
+                        success: true,
+                        status: 'failed',
+                        verifyResult: false,
+                        message: '姓名不符'
+                    });
+                }
+
+                // 檢查通行身份是否相符
+                if (whitelistEntry.pass_status !== pass_status) {
+                    console.log('❌ 通行身份不符:', '白名單=', whitelistEntry.pass_status, '掃描=', pass_status);
+                    return res.json({
+                        success: true,
+                        status: 'failed',
+                        verifyResult: false,
+                        message: '通行身份不符'
+                    });
+                }
+
+                // ✅ 所有檢查都通過
+                console.log('✅ 白名單比對成功！');
+                return res.json({
+                    success: true,
+                    status: 'completed',
+                    verifyResult: result.verifyResult,
+                    data: {
+                        name: name,
+                        roc_birthday: claimsObj.roc_birthday,
+                        id_number: claimsObj.id_number,
+                        pass_status: pass_status,
+                        pass_id: pass_id,
+                        issueDate: claimsObj.issueDate,
+                        expiryDate: claimsObj.expiryDate
+                    },
+                    message: '驗證通過'
+                });
+            }
+        }
+
+        // 驗證失敗
+        if (result.verifyResult === false) {
+            console.log('✗ 驗證失敗');
+            return res.json({
+                success: true,
+                status: 'failed',
+                message: result.resultDescription || '驗證失敗'
+            });
+        }
+
+        // 仍在等待
+        console.log('⏳ 等待驗證結果...');
         res.json({
             success: true,
-            status: result.status, // pending, completed, failed
-            data: result.data, // 驗證通過時的憑證資料
-            message: result.message
+            status: 'pending',
+            message: '等待驗證結果'
         });
 
     } catch (error) {
@@ -208,6 +362,9 @@ app.get('/api/verification-result/:sessionId', async (req, res) => {
         });
     }
 });
+
+
+
 
 // ============================================
 // 白名單管理（內存版本）
