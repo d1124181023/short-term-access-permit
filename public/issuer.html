@@ -102,26 +102,27 @@
                         <label for="pass_id" class="form-label">通行編號 <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="pass_id" 
-                                   placeholder="例：ACC20241030001" required
-                                   pattern="[A-Za-z0-9]+">
-                            <button class="btn btn-outline-secondary" type="button" onclick="generatePassId()">
-                                自動產生
+                                placeholder="點擊下方按鈕產生編號"
+                                readonly> 
+                            <button class="btn btn-outline-primary" type="button" onclick="generatePassId()">
+                            🔄 產生編號
                             </button>
                         </div>
-                        <small class="text-muted">允許大寫字母、小寫字母和數字。點擊「自動產生」按鈕產生唯一編號。</small>
+                        <small class="text-muted">系統自動生成唯一編號，點擊按鈕重新生成</small>
                     </div>
 
                     <div class="mb-3">
-                        <label for="validity" class="form-label">有效期限（天數）<span class="text-danger">*</span></label>
-                        <select class="form-select" id="validity" required>
-                            <option value="1">1天</option>
-                            <option value="3" selected>3天</option>
-                            <option value="7">7天</option>
-                            <option value="14">14天</option>
-                            <option value="30">30天</option>
-                        </select>
-                        <small class="text-muted">選擇該憑證的有效期限</small>
+                        <label for="expiryDate" class="form-label">有效期限截止日期 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="expiryDate" 
+                            placeholder="請輸入日期，格式：YYYY-MM-DD（例：2025-11-15）"
+                            pattern="\d{4}-\d{2}-\d{2}"
+                            required>
+                        <small class="text-muted">
+                            日期格式：YYYY-MM-DD（例如 2025-11-15）<br>
+                            最長期限為 30 天，截止日期不可超過今日起算 30 天
+                        </small>
                     </div>
+
 
                     <div class="d-grid gap-2 d-md-flex gap-md-2 justify-content-md-between">
                         <button type="button" class="btn btn-outline-secondary" onclick="goToStep(1)">
@@ -153,7 +154,7 @@
                             <div class="col-md-6">
                                 <p><strong>通行身份：</strong><span id="summary_pass_status"></span></p>
                                 <p><strong>通行編號：</strong><span id="summary_pass_id"></span></p>
-                                <p><strong>有效期限：</strong><span id="summary_validity"></span>天</p>
+                                <p><strong>有效期限截止日期：</strong><span id="summary_validity"></span></p>
                             </div>
                         </div>
                     </div>

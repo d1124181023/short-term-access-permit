@@ -210,11 +210,38 @@ app.get('/api/verification-result/:sessionId', async (req, res) => {
 });
 
 // ============================================
-// 白名單管理 API（簡易版，使用記憶體儲存）
+// 白名單管理（內存版本）
 // ============================================
-let whitelist = []; // 實際專案應使用資料庫
+let whitelist = [];
 
-// 新增白名單
+/**
+ * 清理過期的白名單項目
+ * 在伺服器啟動時執行，之後每 1 小時執行一次
+ */
+function cleanupExpiredWhitelist() {
+    const now = new Date();
+    const initialCount = whitelist.length;
+    
+    whitelist = whitelist.filter(entry => {
+        const expiryDate = new Date(entry.expiry_date);
+        return expiryDate > now;
+    });
+    
+    const removedCount = initialCount - whitelist.length;
+    if (removedCount > 0) {
+        console.log(`✓ 已清理 ${removedCount} 筆過期白名單項目`);
+    }
+}
+
+// 在伺服器啟動時立即執行一次
+cleanupExpiredWhitelist();
+
+// 每 1 小時執行一次清理
+setInterval(cleanupExpiredWhitelist, 60 * 60 * 1000);
+
+// ============================================
+// 新增白名單 API
+// ============================================
 app.post('/api/whitelist', (req, res) => {
     const entry = {
         id: Date.now(),
@@ -222,6 +249,7 @@ app.post('/api/whitelist', (req, res) => {
         name: req.body.name,
         pass_status: req.body.pass_status,
         created_at: new Date().toISOString(),
+        expiry_date: req.body.expiry_date,  // ← 新增：記錄到期日期
         status: 'active'
     };
     
@@ -229,6 +257,66 @@ app.post('/api/whitelist', (req, res) => {
     console.log('新增白名單:', entry);
     
     res.json({ success: true, data: entry });
+});
+
+// ============================================
+// 查詢白名單 API
+// ============================================
+app.get('/api/whitelist', (req, res) => {
+    // 查詢前先清理過期項目
+    cleanupExpiredWhitelist();
+    res.json({ success: true, data: whitelist });
+});
+
+// ============================================
+// 驗證白名單 API
+// ============================================
+app.post('/api/verify-whitelist', (req, res) => {
+    const { pass_id, name, pass_status } = req.body;
+    
+    // 查詢前先清理過期項目
+    cleanupExpiredWhitelist();
+    
+    const entry = whitelist.find(item => 
+        item.pass_id === pass_id && 
+        item.status === 'active'
+    );
+    
+    if (!entry) {
+        return res.json({
+            success: false,
+            message: '通行編號不存在於白名單或已過期'
+        });
+    }
+    
+    // 檢查是否已過期
+    const expiryDate = new Date(entry.expiry_date);
+    if (expiryDate < new Date()) {
+        return res.json({
+            success: false,
+            message: '通行許可已過期'
+        });
+    }
+    
+    if (entry.name !== name) {
+        return res.json({
+            success: false,
+            message: '姓名不符'
+        });
+    }
+    
+    if (entry.pass_status !== pass_status) {
+        return res.json({
+            success: false,
+            message: '通行身份不符'
+        });
+    }
+    
+    res.json({
+        success: true,
+        message: '驗證通過',
+        data: entry
+    });
 });
 
 // 查詢白名單

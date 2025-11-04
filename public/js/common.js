@@ -70,6 +70,56 @@ function validateRocBirthday(rocBirthday) {
 }
 
 /**
+ * 驗證有效期限是否符合規定
+ * @param {string} expiryDate - 輸入的日期字串 (YYYY-MM-DD)
+ * @returns {boolean}
+ */
+function validateExpiryDate(expiryDate) {
+    if (!expiryDate) {
+        showError('請填寫有效期限截止日期');
+        return false;
+    }
+    
+    // 驗證日期格式
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(expiryDate)) {
+        showError('日期格式不正確，請使用 YYYY-MM-DD 格式（例：2025-11-15）');
+        return false;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const expiry = new Date(expiryDate);
+    expiry.setHours(0, 0, 0, 0);
+    
+    // 檢查日期是否有效
+    if (isNaN(expiry.getTime())) {
+        showError('輸入的日期無效');
+        return false;
+    }
+    
+    // 計算天數差
+    const diffTime = expiry - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 檢查是否在允許的範圍內
+    if (diffDays < 0) {
+        showError('有效期限不能早於今天');
+        return false;
+    }
+    
+    if (diffDays > 30) {
+        showError('有效期限最長為 30 天');
+        return false;
+    }
+    
+    return true;
+}
+
+
+
+/**
  * 將民國日期轉換為西元日期字符串
  * @param {string} rocBirthday - 民國出生年月日（7碼）
  * @returns {string} 西元日期（YYYY-MM-DD）
@@ -84,15 +134,48 @@ function rocToWestern(rocBirthday) {
 }
 
 /**
- * 產生唯一的通行編號
- * @returns {string} 格式：ACC20241030001
+ * 產生唯一的通行編號（並記錄以防重複）
+ * @returns {string} 格式：ACC20251104000001
  */
 function generateUniquePassId() {
     const prefix = 'ACC';
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${prefix}${date}${random}`;
+    const date = new Date().toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+    
+    // 產生更長的亂數（6碼，範圍 000000-999999）
+    const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    const passId = `${prefix}${date}${randomNum}`;
+    
+    // 儲存到 localStorage 的已生成編號清單，用來檢查重複
+    let generatedIds = getFromStorage('generatedPassIds') || [];
+    
+    // 如果產生重複，遞迴重新產生
+    if (generatedIds.includes(passId)) {
+        console.warn('通行編號重複，重新生成...');
+        return generateUniquePassId();
+    }
+    
+    // 加入已生成清單
+    generatedIds.push(passId);
+    saveToStorage('generatedPassIds', generatedIds);
+    
+    console.log('✓ 通行編號已產生並記錄:', passId);
+    return passId;
 }
+
+/**
+ * 清除過期的通行編號記錄（可定期呼叫）
+ */
+function cleanupExpiredPassIds() {
+    let generatedIds = getFromStorage('generatedPassIds') || [];
+    
+    // 保留最近 1000 個編號（防止 localStorage 過滿）
+    if (generatedIds.length > 1000) {
+        generatedIds = generatedIds.slice(-1000);
+        saveToStorage('generatedPassIds', generatedIds);
+        console.log('✓ 已清理過期編號記錄');
+    }
+}
+
 
 /**
  * 格式化日期時間
@@ -117,6 +200,24 @@ function formatDateTime(date = new Date()) {
  */
 function formatDate(date = new Date()) {
     return date.toISOString().split('T')[0];
+}
+
+/**
+ * 格式化民國日期顯示（去掉民國年的前導 0）
+ * @param {string} rocBirthday - 民國出生年月日（7碼，例如 0900101）
+ * @returns {string} 格式化顯示（例如 民國93年1月1日）
+ */
+function formatRocBirthday(rocBirthday) {
+    if (!rocBirthday || rocBirthday.length !== 7) {
+        return rocBirthday;
+    }
+    
+    const year = parseInt(rocBirthday.substring(0, 3));    // 民國年
+    const month = parseInt(rocBirthday.substring(3, 5));   // 月
+    const day = parseInt(rocBirthday.substring(5, 7));     // 日
+    
+    // 去掉民國年的前導 0
+    return `民國${year}年${month}月${day}日`;
 }
 
 /**

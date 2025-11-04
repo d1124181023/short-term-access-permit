@@ -8,8 +8,23 @@ let whitelistData = []; // 儲存白名單資料
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('發行端頁面已載入');
-    loadWhitelist(); // 載入白名單
+    loadWhitelist();
+    
+    // 初始化有效期限日期輸入提示
+    const expiryDateInput = document.getElementById('expiryDate');
+    if (expiryDateInput) {
+        const today = new Date();
+        const maxDate = new Date();
+        maxDate.setDate(maxDate.getDate() + 30);
+    
+        // 在 placeholder 中顯示有效範圍
+        const todayStr = formatDate(today);
+        const maxDateStr = formatDate(maxDate);
+        expiryDateInput.placeholder = `請輸入日期 (${todayStr} 至 ${maxDateStr})`;
+}
+
 });
+
 
 // ===== 步驟導航 =====
 function goToStep(step) {
@@ -34,8 +49,38 @@ function goToStep(step) {
     if (step > 2) {
         formData.pass_status = document.getElementById('pass_status').value;
         formData.pass_id = document.getElementById('pass_id').value;
-        formData.validity = document.getElementById('validity').value;
+        formData.expiryDate = document.getElementById('expiryDate').value;
+    
+        // 驗證日期不超過 30 天
+        if (!validateExpiryDate(formData.expiryDate)) {
+         showError('有效期限不能超過 30 天');
+            return;
+        }
     }
+
+    /**
+     * 驗證有效期限是否符合規定
+    * @param {string} expiryDate - 選擇的到期日期 (YYYY-MM-DD)
+    * @returns {boolean}
+    */
+    function validateExpiryDate(expiryDate) {
+        if (!expiryDate) return false;
+    
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+    
+        const expiry = new Date(expiryDate);
+        expiry.setHours(0, 0, 0, 0);
+    
+        // 計算天數差
+        const diffTime = expiry - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+        // 必須至少是今天或明天，最多 30 天後
+        return diffDays >= 0 && diffDays <= 30;
+    }
+
+
 
     // 隱藏所有 section
     document.getElementById('section1').style.display = 'none';
@@ -85,16 +130,36 @@ function validateStep1() {
 /**
  * 驗證步驟 2 的資料
  */
+/**
+ * 驗證步驟 2 的資料
+ */
 function validateStep2() {
     const passStatus = document.getElementById('pass_status').value.trim();
     const passId = document.getElementById('pass_id').value.trim();
+    const expiryDate = document.getElementById('expiryDate').value.trim();
 
-    if (!passStatus || !passId) {
+    if (!passStatus) {
+        showError('請選擇通行身份');
+        return false;
+    }
+
+    if (!passId) {
+        showError('請先生成通行編號');
+        return false;
+    }
+
+    if (!expiryDate) {
+        showError('請填寫有效期限截止日期');
+        return false;
+    }
+
+    if (!validateExpiryDate(expiryDate)) {
         return false;
     }
 
     return true;
 }
+
 
 /**
  * 更新步驟指示器的視覺狀態
@@ -115,9 +180,26 @@ function updateStepIndicator(activeStep) {
  */
 function generatePassId() {
     const passId = generateUniquePassId();
-    document.getElementById('pass_id').value = passId;
-    showSuccess('已自動產生通行編號');
+    const passIdInput = document.getElementById('pass_id');
+    
+    // 設定新的通行編號
+    passIdInput.value = passId;
+    
+    // 視覺反饋：高亮顯示
+    passIdInput.style.backgroundColor = '#d1e7dd';
+    passIdInput.style.borderColor = '#0f5132';
+    
+    // 3 秒後恢復正常
+    setTimeout(() => {
+        passIdInput.style.backgroundColor = '';
+        passIdInput.style.borderColor = '';
+    }, 3000);
+    
+    // 複製到剪貼簿的選項提示
+    showSuccess(`✓ 通行編號已產生：${passId}`);
+    console.log('通行編號:', passId);
 }
+
 
 /**
  * 顯示摘要資訊
@@ -127,15 +209,13 @@ function displaySummary() {
     document.getElementById('summary_id_number').textContent = formData.id_number;
     
     // 將民國日期轉換為易讀格式
-    const rocBirthday = formData.roc_brithday;
-    const year = rocBirthday.substring(0, 3);
-    const month = rocBirthday.substring(3, 5);
-    const day = rocBirthday.substring(5, 7);
-    document.getElementById('summary_birthday').textContent = `民國${year}年${month}月${day}日`;
+    // 使用新的格式化函數
+    document.getElementById('summary_birthday').textContent = formatRocBirthday(formData.roc_brithday);
     
     document.getElementById('summary_pass_status').textContent = formData.pass_status;
     document.getElementById('summary_pass_id').textContent = formData.pass_id;
-    document.getElementById('summary_validity').textContent = formData.validity;
+    document.getElementById('summary_validity').textContent = formData.expiryDate;
+
 }
 
 /**
@@ -148,7 +228,8 @@ async function issueCredential() {
     try {
         // 計算到期日期
         const issueDate = formatDate();
-        const expiryDate = calculateExpiryDate(parseInt(formData.validity));
+        const expiryDate = formData.expiryDate; // 直接使用使用者選擇的日期
+
 
         // 準備憑證資料
         const credentialData = {
@@ -211,17 +292,17 @@ async function issueCredential() {
             name: formData.name,
             pass_status: formData.pass_status,
             issue_time: formatDateTime(),
+            expiry_date: formData.expiryDate,  // ← 新增：記錄到期日期
             status: 'active'
         };
 
         whitelistData.push(whitelistEntry);
         updateWhitelistTable();
-
-        // 儲存至 localStorage（備份）
         saveToStorage('whitelist', whitelistData);
 
         // 呼叫後端 API 新增白名單
         await apiCall('POST', '/api/whitelist', whitelistEntry);
+
 
         showSuccess('憑證發行成功！訪客可以掃描 QR Code 取得虛擬憑證');
 
