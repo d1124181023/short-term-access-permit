@@ -112,16 +112,21 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="expiryDate" class="form-label">有效期限截止日期 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="expiryDate" 
-                            placeholder="請輸入日期，格式：YYYY-MM-DD（例：2025-11-15）"
-                            pattern="\d{4}-\d{2}-\d{2}"
-                            required>
+                        <label for="validityDays" class="form-label">有效期限（天數）<span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="validityDays" 
+                                placeholder="請輸入天數"
+                                min="1" max="30"
+                                value="3"
+                                required>
+                            <span class="input-group-text">天</span>
+                        </div>
                         <small class="text-muted">
-                            日期格式：YYYY-MM-DD（例如 2025-11-15）<br>
-                            最長期限為 30 天，截止日期不可超過今日起算 30 天
+                            輸入 1 到 30 之間的天數。系統會自動計算截止日期。<br>
+                            <span id="calculatedExpiryDate" class="text-info">（計算結果會在此顯示）</span>
                         </small>
                     </div>
+
 
 
                     <div class="d-grid gap-2 d-md-flex gap-md-2 justify-content-md-between">
@@ -154,7 +159,7 @@
                             <div class="col-md-6">
                                 <p><strong>通行身份：</strong><span id="summary_pass_status"></span></p>
                                 <p><strong>通行編號：</strong><span id="summary_pass_id"></span></p>
-                                <p><strong>有效期限截止日期：</strong><span id="summary_validity"></span></p>
+                                <p><strong>有效期限：</strong><span id="summary_validity"></span></p>
                             </div>
                         </div>
                     </div>

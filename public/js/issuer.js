@@ -10,20 +10,45 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('發行端頁面已載入');
     loadWhitelist();
     
-    // 初始化有效期限日期輸入提示
-    const expiryDateInput = document.getElementById('expiryDate');
-    if (expiryDateInput) {
-        const today = new Date();
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + 30);
+    // 初始化有效期限天數輸入監聽
+    const validityDaysInput = document.getElementById('validityDays');
+    if (validityDaysInput) {
+        // 頁面載入時顯示一次計算結果
+        updateCalculatedExpiryDate();
+        
+        // 當使用者改變輸入時，實時更新顯示的到期日期
+        validityDaysInput.addEventListener('change', updateCalculatedExpiryDate);
+        validityDaysInput.addEventListener('input', updateCalculatedExpiryDate);
+    }
+});
+
+/**
+ * 即時更新計算後的到期日期顯示
+ */
+function updateCalculatedExpiryDate() {
+    const validityDaysInput = document.getElementById('validityDays');
+    const calculatedDateDisplay = document.getElementById('calculatedExpiryDate');
     
-        // 在 placeholder 中顯示有效範圍
-        const todayStr = formatDate(today);
-        const maxDateStr = formatDate(maxDate);
-        expiryDateInput.placeholder = `請輸入日期 (${todayStr} 至 ${maxDateStr})`;
+    const days = parseInt(validityDaysInput.value) || 0;
+    
+    if (days < 1 || days > 30) {
+        calculatedDateDisplay.textContent = '（請輸入 1 到 30 之間的天數）';
+        calculatedDateDisplay.className = 'text-danger';
+        return;
+    }
+    
+    const expiryDate = calculateExpiryDate(days);
+    const displayDate = new Date(expiryDate);
+    const formattedDate = displayDate.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    
+    calculatedDateDisplay.textContent = `（截止日期：${formattedDate}）`;
+    calculatedDateDisplay.className = 'text-success';
 }
 
-});
 
 
 // ===== 步驟導航 =====
@@ -49,14 +74,18 @@ function goToStep(step) {
     if (step > 2) {
         formData.pass_status = document.getElementById('pass_status').value;
         formData.pass_id = document.getElementById('pass_id').value;
-        formData.expiryDate = document.getElementById('expiryDate').value;
+        formData.validityDays = parseInt(document.getElementById('validityDays').value);
     
-        // 驗證日期不超過 30 天
-        if (!validateExpiryDate(formData.expiryDate)) {
-         showError('有效期限不能超過 30 天');
+        // 驗證天數
+        if (!validateValidityDays(formData.validityDays)) {
+            showError('請輸入 1 到 30 之間的天數');
             return;
         }
+    
+        // 根據天數計算到期日期
+        formData.expiryDate = calculateExpiryDate(formData.validityDays);
     }
+
 
     /**
      * 驗證有效期限是否符合規定
@@ -136,7 +165,7 @@ function validateStep1() {
 function validateStep2() {
     const passStatus = document.getElementById('pass_status').value.trim();
     const passId = document.getElementById('pass_id').value.trim();
-    const expiryDate = document.getElementById('expiryDate').value.trim();
+    const validityDays = parseInt(document.getElementById('validityDays').value);
 
     if (!passStatus) {
         showError('請選擇通行身份');
@@ -148,17 +177,23 @@ function validateStep2() {
         return false;
     }
 
-    if (!expiryDate) {
-        showError('請填寫有效期限截止日期');
-        return false;
-    }
-
-    if (!validateExpiryDate(expiryDate)) {
+    if (!validateValidityDays(validityDays)) {
+        showError('請輸入 1 到 30 之間的天數');
         return false;
     }
 
     return true;
 }
+
+/**
+ * 驗證有效期限天數
+ * @param {number} days - 天數
+ * @returns {boolean}
+ */
+function validateValidityDays(days) {
+    return !isNaN(days) && days >= 1 && days <= 30;
+}
+
 
 
 /**
@@ -214,8 +249,14 @@ function displaySummary() {
     
     document.getElementById('summary_pass_status').textContent = formData.pass_status;
     document.getElementById('summary_pass_id').textContent = formData.pass_id;
-    document.getElementById('summary_validity').textContent = formData.expiryDate;
-
+    // 計算並顯示到期日期
+    const expiryDateObj = new Date(formData.expiryDate);
+    const formattedExpiryDate = expiryDateObj.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    document.getElementById('summary_validity').textContent = `${formData.validityDays} 天（截止日期：${formattedExpiryDate}）`;
 }
 
 /**
@@ -327,46 +368,90 @@ async function issueCredential() {
 function updateWhitelistTable() {
     const tbody = document.getElementById('whitelistTableBody');
     
-    if (whitelistData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">目前尚無發行紀錄</td></tr>';
+    // 過濾掉已過期的項目
+    const activeEntries = whitelistData.filter(entry => {
+        if (!entry.expiry_date) return true; // 如果沒有過期日期，保留
+        
+        const expiryDate = new Date(entry.expiry_date);
+        const now = new Date();
+        return expiryDate > now; // 只保留未過期的
+    });
+    
+    // 如果有項目被過濾出去，更新 whitelistData
+    if (activeEntries.length < whitelistData.length) {
+        const removedCount = whitelistData.length - activeEntries.length;
+        whitelistData = activeEntries;
+        saveToStorage('whitelist', whitelistData);
+        console.log(`✓ 自動清理 ${removedCount} 筆過期白名單項目`);
+    }
+    
+    if (activeEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">目前尚無發行紀錄或全部已過期</td></tr>';
         return;
     }
 
-    tbody.innerHTML = whitelistData.map(entry => `
-        <tr>
-            <td class="text-monospace">${entry.pass_id}</td>
-            <td>${entry.name}</td>
-            <td>${entry.pass_status}</td>
-            <td>${entry.issue_time}</td>
-            <td><span class="badge bg-success">${entry.status}</span></td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = activeEntries.map(entry => {
+        // 計算到期狀態
+        const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
+        const now = new Date();
+        const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
+        
+        // 根據剩餘天數決定徽章顏色
+        let badgeClass = 'bg-success';
+        let statusText = entry.status;
+        
+        if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
+            badgeClass = 'bg-warning'; // 即將過期
+            statusText = `${entry.status} (${daysUntilExpiry}天)`;
+        } else if (daysUntilExpiry <= 0) {
+            badgeClass = 'bg-danger'; // 已過期
+            statusText = '已過期';
+        }
+        
+        return `
+            <tr>
+                <td class="text-monospace">${entry.pass_id}</td>
+                <td>${entry.name}</td>
+                <td>${entry.pass_status}</td>
+                <td>${entry.issue_time}</td>
+                <td><span class="badge ${badgeClass}">${statusText}</span></td>
+            </tr>
+        `;
+    }).join('');
 }
+
 
 /**
  * 載入白名單資料
  */
 function loadWhitelist() {
-    // 嘗試從 localStorage 載入
     const savedWhitelist = getFromStorage('whitelist');
     if (savedWhitelist) {
-        whitelistData = savedWhitelist;
+        // 載入時自動清理過期項目
+        whitelistData = savedWhitelist.filter(entry => {
+            if (!entry.expiry_date) return true;
+            const expiryDate = new Date(entry.expiry_date);
+            return expiryDate > new Date();
+        });
+        saveToStorage('whitelist', whitelistData);
         updateWhitelistTable();
     }
 
-    // 非同步從後端載入
+    // 同時從後端同步
     apiCall('GET', '/api/whitelist')
         .then(response => {
             if (response.success && response.data.length > 0) {
+                // 後端已清理過期項目
                 whitelistData = response.data;
                 updateWhitelistTable();
+                saveToStorage('whitelist', whitelistData);
             }
         })
         .catch(error => {
             console.warn('載入白名單失敗:', error);
-            // 使用 localStorage 的資料作為備份
         });
 }
+
 
 /**
  * 重新開始
