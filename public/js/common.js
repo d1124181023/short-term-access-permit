@@ -362,3 +362,208 @@ function removeFromStorage(key) {
 }
 
 console.log('公共函數庫已載入');
+
+/**
+ * 對姓名進行打碼
+ * @param {string} name - 原始姓名
+ * @returns {string} 打碼後的姓名
+ * 
+ * 規則：只保留第一個字，其餘替換為 "*"
+ * 例：王小明 → 王**
+ */
+function maskName(name) {
+    if (!name || name.length === 0) return '';
+    if (name.length === 1) return name;
+    return name.charAt(0) + '*'.repeat(name.length - 1);
+}
+
+/**
+ * 對身分證字號進行打碼
+ * @param {string} idNumber - 身分證字號
+ * @returns {string} 打碼後的身分證字號
+ * 
+ * 規則：保留首位字母與數字，中間全部替換為 "*"，保留結尾3碼
+ * 例：F123456789 → F1*****789
+ */
+function maskIdNumber(idNumber) {
+    if (!idNumber || idNumber.length < 4) return idNumber;
+    const first = idNumber.charAt(0);
+    const second = idNumber.charAt(1);
+    const last3 = idNumber.slice(-3);
+    const middleLength = idNumber.length - 5;
+    return first + second + '*'.repeat(middleLength) + last3;
+}
+
+/**
+ * 對民國出生年月日進行打碼
+ * @param {string} rocBirthday - 民國出生年月日
+ * @returns {string} 打碼後的日期
+ * 
+ * 例：
+ * - 民國90年1月1日 → 民國90年**月**日
+ * - 0900101 → 民國90年**月**日
+ */
+function maskRocBirthday(rocBirthday) {
+    if (!rocBirthday) return '';
+    
+    // 先嘗試匹配「民國YY年M月D日」格式（已格式化）
+    const rocPattern = /民國(\d+)年(\d+)月(\d+)日/;
+    const match = rocBirthday.match(rocPattern);
+    
+    if (match) {
+        // 已是中文格式，直接打碼
+        return `民國${match[1]}年**月**日`;
+    }
+    
+    // 嘗試匹配純數字格式（7碼 YYYYMMDD）
+    const numberPattern = /^(\d{3})(\d{2})(\d{2})$/;
+    const numberMatch = rocBirthday.match(numberPattern);
+    
+    if (numberMatch) {
+        // 純數字格式：轉換為中文格式後再打碼
+        // 移除前面的 "0"：090 → 90
+        const year = numberMatch[1].replace(/^0+/, '');  // ← 用 replace 移除前面的 0
+        return `民國${year}年**月**日`;
+    }
+    
+    // 如果是其他格式，嘗試取前 3 碼作為年份
+    if (rocBirthday.length >= 7) {
+        // 移除前面的 "0"
+        const year = rocBirthday.substring(0, 3).replace(/^0+/, '');  // ← 用 replace 移除前面的 0
+        return `民國${year}年**月**日`;
+    }
+    
+    // 都不符合，直接返回原值
+    return rocBirthday;
+}
+
+
+/**
+ * 完整的個資打碼對象
+ * @param {object} data - 原始數據對象
+ * @returns {object} 打碼後的數據對象
+ */
+function maskPersonalData(data) {
+    return {
+        name: data.name ? maskName(data.name) : '',
+        id_number: data.id_number ? maskIdNumber(data.id_number) : '',
+        roc_birthday: data.roc_birthday ? maskRocBirthday(data.roc_birthday) : '',
+    };
+}
+
+// ============================================
+// issuer.js 中的應用
+// ============================================
+
+/**
+ * 修改 displaySummary() 函數
+ * 在步驟 3 中顯示打碼後的資訊
+ */
+function displaySummary() {
+    console.log('顯示摘要（步驟 3）:', formData);
+    
+    // 將原始數據打碼
+    const maskedData = maskPersonalData({
+        name: formData.name,
+        id_number: formData.id_number,
+        roc_birthday: formData.roc_brithday,  // 注意：formData 中是 roc_brithday
+        pass_id: formData.pass_id
+    });
+    
+    // 顯示打碼後的資訊
+    document.getElementById('summary_name').textContent = maskedData.name || '未輸入';
+    document.getElementById('summary_id_number').textContent = maskedData.id_number || '未輸入';
+    document.getElementById('summary_birthday').textContent = maskedData.roc_birthday || '未輸入';
+    document.getElementById('summary_pass_status').textContent = formData.pass_status || '未選擇';
+    document.getElementById('summary_pass_id').textContent = maskedData.pass_id || '未產生';
+    
+    // 有效期限顯示（不需打碼）
+    const expiryDateObj = new Date(formData.expiryDate);
+    const formattedExpiryDate = expiryDateObj.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    document.getElementById('summary_validity').textContent = 
+        `${formData.validityDays} 天（截止日期：${formattedExpiryDate}）`;
+}
+
+
+/**
+ * 在驗證結果中顯示打碼後的資訊
+ */
+function displaySuccessResult(data) {
+    console.log('顯示驗證成功結果（打碼版）:', data);
+    
+    // 將驗證結果中的個資打碼
+    const maskedData = maskPersonalData({
+        name: data.name,
+        id_number: data.id_number,
+        roc_birthday: data.roc_birthday,
+        pass_id: data.pass_id
+    });
+    
+    // 隱藏錯誤和等待信息
+    document.getElementById('waitingMessage').style.display = 'none';
+    document.getElementById('errorContainer').style.display = 'none';
+    
+    // 顯示成功結果區域
+    const resultBox = document.getElementById('resultBox');
+    resultBox.style.display = 'block';
+    resultBox.className = 'result-box result-success';
+    
+    // 填入打碼後的資訊
+    resultBox.innerHTML = `
+        <h5 class="mb-3">✓ 驗證通過</h5>
+        <div class="verification-details">
+            <p><strong>姓名：</strong> ${maskedData.name}</p>
+            <p><strong>身分證字號：</strong> ${maskedData.id_number}</p>
+            <p><strong>出生年月日：</strong> ${maskedData.roc_birthday}</p>
+            <p><strong>通行身份：</strong> ${data.pass_status}</p>
+            <p><strong>通行編號：</strong> ${maskedData.pass_id}</p>
+            <p class="text-success"><strong>✓ 允許通行</strong></p>
+        </div>
+    `;
+    
+    // 記錄驗証紀錄時使用原始數據（不打碼）
+    recordVerificationLog({
+        timestamp: new Date().toLocaleString('zh-TW'),
+        name: data.name,
+        pass_id: data.pass_id,
+        result: 'success'
+    });
+}
+
+/**
+ * 修改 updateVerificationLogsTable() 函數
+ * 在驗証紀錄表中顯示打碼後的資訊
+ */
+function updateVerificationLogsTable() {
+    const tbody = document.getElementById('verificationLogsTableBody');
+    
+    if (!tbody || !verificationLogs || verificationLogs.length === 0) {
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">目前尚無驗証紀錄</td></tr>';
+        }
+        return;
+    }
+    
+    tbody.innerHTML = verificationLogs.map(log => {
+        // 對表格中顯示的資訊進行打碼
+        const maskedName = maskName(log.name);
+        const maskedPassId = maskPassId(log.pass_id);
+        
+        const statusBadge = log.result === 'success' 
+            ? '<span class="badge bg-success">通過</span>'
+            : '<span class="badge bg-danger">失敗</span>';
+        
+        return `
+            <tr>
+                <td>${log.timestamp}</td>
+                <td>${maskedName}</td>
+                <td>${maskedPassId}</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+    }).join('');
+}

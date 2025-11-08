@@ -238,20 +238,29 @@ function generatePassId() {
 
 
 /**
- * 顯示摘要資訊
+ * 顯示步驟 3 的摘要（使用打碼）
  */
 function displaySummary() {
-    document.getElementById('summary_name').textContent = formData.name;
-    document.getElementById('summary_id_number').textContent = formData.id_number;
+    console.log('顯示摘要（步驟 3）:', formData);
     
-    // 將民國日期轉換為易讀格式
-    // 使用新的格式化函數
-    document.getElementById('summary_birthday').textContent = formatRocBirthday(formData.roc_brithday);
+    // 將原始數據打碼
+    const maskedData = maskPersonalData({
+        name: formData.name,
+        id_number: formData.id_number,
+        roc_birthday: formData.roc_brithday,
+        pass_id: formData.pass_id
+    });
     
-    document.getElementById('summary_pass_status').textContent = formData.pass_status;
-    document.getElementById('summary_pass_id').textContent = formData.pass_id;
+    // 在步驟 3 中顯示打碼後的資訊
+    console.log('打碼後的資訊:', maskedData);
     
-    // 計算並顯示到期日期
+    document.getElementById('summary_name').textContent = maskedData.name || '未輸入';
+    document.getElementById('summary_id_number').textContent = maskedData.id_number || '未輸入';
+    document.getElementById('summary_birthday').textContent = maskedData.roc_birthday || '未輸入';
+    document.getElementById('summary_pass_status').textContent = formData.pass_status || '未選擇';
+    document.getElementById('summary_pass_id').textContent = formData.pass_id || '未產生';
+    
+    // 有效期限不需打碼，保持原樣
     const expiryDateObj = new Date(formData.expiryDate);
     const formattedExpiryDate = expiryDateObj.toLocaleString('zh-TW', {
         year: 'numeric',
@@ -259,7 +268,7 @@ function displaySummary() {
         day: '2-digit'
     });
     document.getElementById('summary_validity').textContent = 
-        `${formData.validityDays} 天（${formData.validityHours} 小時，截止日期：${formattedExpiryDate}）`;
+        `${formData.validityDays} 天（截止日期：${formattedExpiryDate}）`;
 }
 
 /**
