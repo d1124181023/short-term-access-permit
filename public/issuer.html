@@ -77,86 +77,72 @@
             </div>
 
             <!-- ===== 步驟 2: 通行資訊設定 ===== -->
-            <div id="step2" class="step-container" style="display: none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>
-                            <span class="step-number">2</span>
-                            通行資訊設定
-                        </h3>
-                    </div>
-
+            <div id="step2" class="step-container">
+                <h4 class="mb-4">步驟 2：通行資訊設定</h4>
+    
+                 <div class="card mb-4">
                     <div class="card-body">
-                    <!-- 通行身份 -->
-                    <div class="mb-3">
-                        <label for="pass_status" class="form-label">通行身份 <span class="text-danger">*</span></label>
-                        <select class="form-select" id="pass_status" required>
-                            <option value="">請選擇</option>
-                            <option value="訪客">訪客</option>
-                            <option value="臨時人員">臨時人員</option>
-                            <option value="承包商">承包商</option>
-                            <option value="廠商">廠商</option>
-                        </select>
-                    </div>
+                        <div class="row">
+                            <!-- 左列 -->
+                            <div class="col-md-6">
+                                <!-- 通行身份 -->
+                                <div class="mb-3">
+                                <label for="pass_status" class="form-label">通行身份 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="pass_status" required>
+                                    <option value="">請選擇</option>
+                                    <option value="訪客">訪客</option>
+                                    <option value="臨時人員">臨時人員</option>
+                                    <option value="承包商">承包商</option>
+                                </select>
+                            </div>
 
-                    <!-- 有效期限（天數） -->
-                    <div class="mb-3">
-                        <label for="validityDays" class="form-label">有效期限（天數）<span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="validityDays" 
-                                    placeholder="請輸入天數"
-                                    min="1" max="30"
-                                    value="3"
-                                    required>
-                            <span class="input-group-text">天</span>
+                            <!-- 有效期限（天數） -->
+                            <div class="mb-3">
+                                <label for="validityDays" class="form-label">有效期限（天數）<span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="validityDays" 
+                                            placeholder="請輸入天數" min="1" max="30" value="3" required>
+                                    <span class="input-group-text">天</span>
+                                </div>
+                                <small class="text-muted" id="calculatedExpiryDate">（計算結果會在此顯示）</small>
+                            </div>
                         </div>
-                        <small class="text-muted">
-                            輸入 1 到 30 之間的天數。系統會自動計算截止日期。<br>
-                            <span id="calculatedExpiryDate" class="text-info">（計算結果會在此顯示）</span>
-                        </small>
-                    </div> 
 
-                    <!-- 有效期限（小時數）- 唯讀示意用 -->
-                    <div class="mb-3">
-                        <label for="validityHours" class="form-label">有效期限（小時數）<span class="text-muted">（功能規劃中）</span></label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="validityHours" 
-                                    placeholder="功能規劃中，暫未啟用"
-                                    min="0" max="720"
-                                    value="0"
-                                    readonly>
-                            <span class="input-group-text">小時</span>
+                        <!-- 右列 -->
+                        <div class="col-md-6">
+                            <!-- 有效期限（小時數） -->
+                            <div class="mb-3">
+                                <label for="validityHours" class="form-label">有效期限（小時數）<span class="text-muted">（唯讀）</span></label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="validityHours" 
+                                    placeholder="自動計算" min="0" max="720" value="0" readonly>
+                                <span class="input-group-text">小時</span>
+                            </div>
                         </div>
-                        <small class="text-muted">
-                            <span class="badge bg-secondary">規劃功能</span>
-                            支援小於一天的有效期限設定（例如臨時訪客卡）。<br>
-                            當啟用此功能時，可設定精確到小時的有效期限。
-                        </small>
-                    </div>
 
-                    <!-- 通行編號（往下移動） -->
-                    <div class="mb-3">
-                        <label for="pass_id" class="form-label">通行編號 <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="pass_id" 
-                                placeholder="點擊下方按鈕產生編號"
-                                readonly>
-                            <button class="btn btn-outline-primary" type="button" onclick="generatePassId()">
-                                🔄 產生編號
-                            </button>
-                        </div>
-                        <small class="text-muted">系統自動生成唯一編號，點擊按鈕重新生成</small>
-                    </div>
-
-                        <!-- 按鈕區 -->
-                        <div class="button-group">
-                            <button type="button" class="btn btn-secondary" onclick="goToStep(1)">上一步</button>
-                            <button type="button" class="btn btn-primary" onclick="goToStep(3)">下一步</button>
+                        <!-- 通行編號 -->
+                        <div class="mb-3">
+                            <label for="pass_id" class="form-label">通行編號 <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="pass_id" 
+                                       placeholder="自動產生" readonly>
+                                <button class="btn btn-outline-primary" type="button" onclick="generatePassId()">
+                                    🔄 產生編號
+                                </button>
+                            </div>
+                            <small class="text-muted">系統自動產生唯一編號，點擊「產生編號」重新產生</small>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- 按鈕區 -->
+        <div class="button-group">
+            <button type="button" class="btn btn-secondary" onclick="goToStep(1)">← 上一步</button>
+            <button type="button" class="btn btn-primary" onclick="goToStep(3)">下一步 →</button>
+        </div>
+    </div>
 
             <!-- ===== 步驟 3: 產生憑證 ===== -->
             <div id="step3" class="section-content" style="display: none;">
