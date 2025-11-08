@@ -329,17 +329,20 @@ async function issueCredential() {
 
         // 新增至白名單
         const whitelistEntry = {
+            id: Date.now(),  // ← 確保有 ID
             pass_id: formData.pass_id,
             name: formData.name,
             pass_status: formData.pass_status,
-            issue_time: formatDateTime(),  // ← 確保這個值存在
-            expiry_date: formData.expiryDate,  // ← 新增：到期日期
+            issue_time: formatDateTime(),
+            expiry_date: formData.expiryDate,
             status: 'active'
         };
 
         whitelistData.push(whitelistEntry);
         updateWhitelistTable();
         saveToStorage('whitelist', whitelistData);
+
+        console.log('✓ 已新增到白名單:', whitelistEntry);
 
         // 呼叫後端 API 新增白名單
         await apiCall('POST', '/api/whitelist', whitelistEntry);
@@ -396,11 +399,15 @@ function updateWhitelistTable() {
     }
 
     tbody.innerHTML = activeEntries.map(entry => {
-        // 【修復】確保時間格式正確，若為 undefined 則使用預設值
-        const issueTime = entry.issue_time || formatDateTime();  // ← 防守
-        const expiryDateStr = entry.expiry_date || '未設定';  // ← 防守
+        // 【關鍵】確保每個項目都有 ID
+        if (!entry.id) {
+            console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
+            entry.id = Date.now() + Math.random();  // 產生唯一 ID
+        }
         
-        // 計算剩餘天數
+        const issueTime = entry.issue_time || formatDateTime();
+        const expiryDateStr = entry.expiry_date || '未設定';
+        
         const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
         const now = new Date();
         const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
@@ -428,6 +435,7 @@ function updateWhitelistTable() {
                     <button class="btn btn-sm btn-danger" 
                             onclick="removeWhitelistEntry(${entry.id}, '${entry.name}')"
                             title="取消此人員的通行權限"
+                            data-id="${entry.id}"
                             style="padding: 2px 6px; font-size: 0.8rem;">
                         ✕
                     </button>
@@ -440,12 +448,22 @@ function updateWhitelistTable() {
 }
 
 
+
 /**
  * 移除白名單項目
  * @param {number} id - 白名單項目 ID
  * @param {string} name - 人員姓名（用於確認訊息）
  */
 async function removeWhitelistEntry(id, name) {
+    console.log('【移除白名單】id:', id, 'name:', name);
+    
+    // 【關鍵】檢查 ID 是否有效
+    if (id === undefined || id === null || id === 'undefined') {
+        console.error('❌ ID 無效:', id);
+        showError('無法刪除：項目 ID 錯誤');
+        return;
+    }
+    
     // 確認對話框
     const confirmed = confirm(`確定要取消 ${name} 的通行權限嗎？此操作無法復原。`);
     if (!confirmed) {
@@ -464,7 +482,7 @@ async function removeWhitelistEntry(id, name) {
         }
 
         // 更新前端白名單
-        whitelistData = whitelistData.filter(entry => entry.id !== id);
+        whitelistData = whitelistData.filter(entry => entry.id != id);  // ← 使用 != 而非 !==
         saveToStorage('whitelist', whitelistData);
         updateWhitelistTable();
 
@@ -476,6 +494,7 @@ async function removeWhitelistEntry(id, name) {
         showError('取消權限失敗：' + error.message);
     }
 }
+
 
 
 

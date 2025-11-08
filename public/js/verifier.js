@@ -390,17 +390,35 @@ function loadWhitelist() {
     
     if (savedWhitelist && Array.isArray(savedWhitelist) && savedWhitelist.length > 0) {
         console.log('✓ 從 localStorage 載入白名單，共', savedWhitelist.length, '筆');
-        whitelistData = savedWhitelist;
+        
+        // 【關鍵】確保每個項目都有 ID
+        whitelistData = savedWhitelist.map(entry => {
+            if (!entry.id) {
+                console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
+                entry.id = Date.now() + Math.random();
+            }
+            return entry;
+        });
+        
         updateWhitelistTable();
     }
 
+    // 同時從後端載入
     apiCall('GET', '/api/whitelist')
         .then(response => {
             if (response.success && response.data) {
                 console.log('✓ 從後端載入白名單，共', response.data.length, '筆');
                 
-                // 【關鍵】合併資料而不是覆蓋
-                const mergedData = mergeWhitelistData(whitelistData, response.data);
+                // 【關鍵】確保每個項目都有 ID
+                const remoteData = response.data.map(entry => {
+                    if (!entry.id) {
+                        console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
+                        entry.id = Date.now() + Math.random();
+                    }
+                    return entry;
+                });
+                
+                const mergedData = mergeWhitelistData(whitelistData, remoteData);
                 
                 whitelistData = mergedData;
                 saveToStorage('whitelist', whitelistData);
@@ -413,6 +431,7 @@ function loadWhitelist() {
             console.warn('⚠️ 從後端載入白名單失敗（使用本地副本）:', error);
         });
 }
+
 
 /**
  * 合併白名單資料
@@ -445,29 +464,55 @@ function mergeWhitelistData(localData, remoteData) {
  */
 function updateWhitelistTable() {
     const tbody = document.getElementById('whitelistTableBody');
-
-    if (!whitelistData || whitelistData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">目前尚無白名單資訊</td></tr>';
+    
+    // 確保白名單資料有效
+    if (!whitelistData || !Array.isArray(whitelistData)) {
+        console.error('❌ whitelistData 無效');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">資料載入失敗</td></tr>';
+        return;
+    }
+    
+    const activeEntries = whitelistData.filter(entry => {
+        if (!entry.expiry_date) return true;
+        const expiryDate = new Date(entry.expiry_date);
+        const now = new Date();
+        return expiryDate > now;
+    });
+    
+    if (activeEntries.length < whitelistData.length) {
+        const removedCount = whitelistData.length - activeEntries.length;
+        whitelistData = activeEntries;
+        saveToStorage('whitelist', whitelistData);
+        console.log(`✓ 自動清理 ${removedCount} 筆過期白名單項目`);
+    }
+    
+    if (activeEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">目前尚無發行紀錄或全部已過期</td></tr>';
         return;
     }
 
-    tbody.innerHTML = whitelistData.map(entry => {
-        // 【修復】確保時間格式正確
-        const issueTime = entry.issue_time || entry.created_at || '未記錄';  // ← 防守
-        const expiryDateStr = entry.expiry_date || '未設定';  // ← 防守
+    tbody.innerHTML = activeEntries.map(entry => {
+        // 【關鍵】確保每個項目都有 ID
+        if (!entry.id) {
+            console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
+            entry.id = Date.now() + Math.random();  // 產生唯一 ID
+        }
+        
+        const issueTime = entry.issue_time || formatDateTime();
+        const expiryDateStr = entry.expiry_date || '未設定';
         
         const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
         const now = new Date();
         const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
         
-        let badgeClass = 'bg-success';
+        let statusBadgeClass = 'bg-success';
         let statusText = entry.status;
         
         if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
-            badgeClass = 'bg-warning text-dark';
+            statusBadgeClass = 'bg-warning text-dark';
             statusText = `即將到期 (${daysUntilExpiry}天)`;
         } else if (daysUntilExpiry < 0) {
-            badgeClass = 'bg-danger';
+            statusBadgeClass = 'bg-danger';
             statusText = '已過期';
         }
         
@@ -478,11 +523,12 @@ function updateWhitelistTable() {
                 <td>${entry.pass_status}</td>
                 <td><small>${issueTime}</small></td>
                 <td><small>${expiryDateStr}</small></td>
-                <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
                 <td>
                     <button class="btn btn-sm btn-danger" 
                             onclick="removeWhitelistEntry(${entry.id}, '${entry.name}')"
                             title="取消此人員的通行權限"
+                            data-id="${entry.id}"
                             style="padding: 2px 6px; font-size: 0.8rem;">
                         ✕
                     </button>
@@ -490,17 +536,38 @@ function updateWhitelistTable() {
             </tr>
         `;
     }).join('');
+    
+    console.log('✓ 白名單表格已更新');
 }
 
 
+
 /**
- * 移除白名單項目（驗證端）
+ * 移除白名單項目
+ * @param {number} id - 白名單項目 ID
+ * @param {string} name - 人員姓名（用於確認訊息）
  */
 async function removeWhitelistEntry(id, name) {
-    const confirmed = confirm(`確定要取消 ${name} 的通行權限嗎？`);
-    if (!confirmed) return;
+    console.log('【移除白名單】id:', id, 'name:', name);
+    
+    // 【關鍵】檢查 ID 是否有效
+    if (id === undefined || id === null || id === 'undefined') {
+        console.error('❌ ID 無效:', id);
+        showError('無法刪除：項目 ID 錯誤');
+        return;
+    }
+    
+    // 確認對話框
+    const confirmed = confirm(`確定要取消 ${name} 的通行權限嗎？此操作無法復原。`);
+    if (!confirmed) {
+        console.log('已取消移除操作');
+        return;
+    }
 
     try {
+        console.log('正在取消權限:', id, name);
+        
+        // 呼叫後端 API 刪除
         const response = await apiCall('DELETE', `/api/whitelist/${id}`, null);
 
         if (!response.success) {
@@ -508,17 +575,19 @@ async function removeWhitelistEntry(id, name) {
         }
 
         // 更新前端白名單
-        whitelistData = whitelistData.filter(entry => entry.id !== id);
-        saveToStorage('verificationLogs', whitelistData);  // 注：這邊可能要改名
+        whitelistData = whitelistData.filter(entry => entry.id != id);  // ← 使用 != 而非 !==
+        saveToStorage('whitelist', whitelistData);
         updateWhitelistTable();
 
         showSuccess(`✓ 已取消 ${name} 的通行權限`);
+        console.log('✓ 已移除:', name);
 
     } catch (error) {
         console.error('移除白名單失敗:', error);
         showError('取消權限失敗：' + error.message);
     }
 }
+
 
 
 /**
