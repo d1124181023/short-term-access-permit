@@ -21,7 +21,7 @@
 #### 三步驟簡潔流程
 1. **步驟 1：虛擬身分證資料**
    - 輸入姓名、身分證字號、民國出生年月日
-   - 格式驗証
+   - 格式驗證
    - 清晰的提示說明
 
 2. **步驟 2：通行資訊設定**
@@ -51,12 +51,12 @@
 ### 驗證端 (Verifier)
 
 #### 掃碼驗證
-- 掃描 QR Code 驗証身份
+- 掃描 QR Code 驗證身份
 - 實時白名單比對
-- 清晰的驗証結果反饋
+- 清晰的驗證結果反饋
 
-#### 驗証紀錄
-- 完整的驗証日誌
+#### 驗證紀錄
+- 完整的驗證日誌
 - 包含時間戳、人員、結果
 - 支持歷史查詢
 
@@ -93,15 +93,15 @@
 │   ├── js/
 │   │   ├── common.js          # 公共函數庫（包括打碼函數）
 │   │   ├── issuer.js          # 發行端主邏輯
-│   │   └── verifier.js        # 驗証端主邏輯
+│   │   └── verifier.js        # 驗證端主邏輯
 │   └── qrcode.min.js          # QR Code 庫
 ├── public/
 │   ├── issuer.html            # 發行端頁面
-│   ├── verifier.html          # 驗証端頁面
+│   ├── verifier.html          # 驗證端頁面
 │   └── index.html             # 首頁
 ├── data/
 │   ├── whitelist.json         # 白名單數據
-│   └── verification-logs.json # 驗証紀錄
+│   └── verification-logs.json # 驗證紀錄
 ├── server.js                  # Express 伺服器
 ├── package.json               # 依賴配置
 └── README.md                  # 本文檔
@@ -139,7 +139,7 @@ npm run dev
 4. **存取應用**
 - 首頁：http://localhost:3000
 - 發行端：http://localhost:3000/issuer.html
-- 驗証端：http://localhost:3000/verifier.html
+- 驗證端：http://localhost:3000/verifier.html
 
 ---
 
@@ -170,9 +170,9 @@ http://localhost:3000/issuer.html
 - QR Code 自動生成並添加白名單
 - 完成發行
 
-### 驗証流程
+### 驗證流程
 
-#### 1. 進入驗証端
+#### 1. 進入驗證端
 ```
 http://localhost:3000/verifier.html
 ```
@@ -181,12 +181,12 @@ http://localhost:3000/verifier.html
 - 使用相機或掃描工具
 - 掃描發行的 QR Code
 
-#### 3. 查看驗証結果
+#### 3. 查看驗證結果
 - ✓ 通過：允許通行
 - ✗ 失敗：拒絕通行
 
-#### 4. 查看驗証紀錄
-- 完整的驗証日誌列表
+#### 4. 查看驗證紀錄
+- 完整的驗證日誌列表
 - 包含時間、人員、結果
 
 ---
@@ -195,13 +195,13 @@ http://localhost:3000/verifier.html
 
 ### 個資保護
 - 敏感信息在前端打碼顯示
-- 實際數據在後端保持完整，用於驗証
+- 實際數據在後端保持完整，用於驗證
 - 支持根據需求調整打碼規則
 
-### 白名單驗証
+### 白名單驗證
 - 到期自動禁用
 - 支持手動刪除權限
-- 驗証時實時比對
+- 驗證時實時比對
 
 ### 數據存儲
 - JSON 文件儲存於服務器本地
@@ -231,9 +231,9 @@ curl -X POST http://localhost:3000/api/whitelist \
 curl -X DELETE http://localhost:3000/api/whitelist/123
 ```
 
-### 發行憑証
+### 發行憑證
 
-**POST** `/api/issue-credential` - 發行憑証
+**POST** `/api/issue-credential` - 發行憑證
 ```bash
 curl -X POST http://localhost:3000/api/issue-credential \
   -H "Content-Type: application/json" \
@@ -244,9 +244,9 @@ curl -X POST http://localhost:3000/api/issue-credential \
   }'
 ```
 
-### 驗証紀錄
+### 驗證紀錄
 
-**GET** `/api/verification-logs` - 獲取驗証紀錄
+**GET** `/api/verification-logs` - 獲取驗證紀錄
 ```bash
 curl http://localhost:3000/api/verification-logs
 ```
@@ -279,7 +279,7 @@ curl http://localhost:3000/api/verification-logs
 
 ### 測試用例
 
-#### 驗証端測試數據
+#### 驗證端測試數據
 ```
 姓名：王小明
 身分證：F123456789
@@ -289,12 +289,12 @@ curl http://localhost:3000/api/verification-logs
 ```
 
 #### 快速測試
-1. 發行一個新憑証
+1. 發行一個新憑證
 2. 掃描 QR Code
-3. 驗証應該通過
+3. 驗證應該通過
 4. 檢查白名單
 5. 刪除白名單項目
-6. 再次驗証應該失敗
+6. 再次驗證應該失敗
 
 ---
 
@@ -306,55 +306,16 @@ curl http://localhost:3000/api/verification-logs
 
 ---
 
-## 🚀 未來改進計畫
-
-### 短期
-- [ ] 添加更詳細的驗証紀錄分析
-- [ ] 支持批量發行憑証
-- [ ] 實現修改個別憑証有效期
-
-### 中期
-- [ ] 遷移到關係型數據庫（MySQL/PostgreSQL）
-- [ ] 添加用戶認証系統
-- [ ] 實現後台管理面板
-
-### 長期
-- [ ] 支持多組織/部門管理
-- [ ] 集成生物識別驗証
-- [ ] 建立完整的審計追蹤系統
-
----
-
 ## 📝 更新日誌
 
 ### v1.0 (2025-11-09) - 正式發佈
-- ✅ 完整的發行和驗証流程
+- ✅ 完整的發行和驗證流程
 - ✅ 個資打碼保護功能
 - ✅ 白名單管理系統
 - ✅ QR Code 生成和掃描
 - ✅ 統一的 UI/UX 設計
 - ✅ 響應式佈局支持
 - ✅ 完整的 API 接口
-
----
-
-## 👥 貢獻指南
-
-歡迎提交 Issue 和 Pull Request！
-
-### 報告 Bug
-請在 GitHub 上開啟 Issue，包含：
-- Bug 描述
-- 重現步驟
-- 預期結果
-- 實際結果
-
-### 提交改進
-1. Fork 本倉庫
-2. 建立特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 開啟 Pull Request
 
 ---
 
@@ -366,20 +327,4 @@ curl http://localhost:3000/api/verification-logs
 
 ## 📞 聯繫方式
 
-- **GitHub Issues** - 提交問題和建議
-- **郵件** - 待補充
-
----
-
-## 🙏 致謝
-
-感謝所有貢獻者和使用者的支持！
-
----
-
-## 📚 相關資源
-
-- [QRCode.js 文檔](https://davidsharp.com/qrcode.js/)
-- [Bootstrap 5 文檔](https://getbootstrap.com/)
-- [Express.js 文檔](https://expressjs.com/)
-- [Node.js 文檔](https://nodejs.org/)
+- **郵件** - d1124181023@gm.lhu.edu.tw
