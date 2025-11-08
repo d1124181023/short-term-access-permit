@@ -69,6 +69,17 @@ body {
     box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
 }
 
+/* 步驟容器 */
+.step-container {
+    display: none !important;  /* 預設隱藏 */
+}
+
+.step-container.active {
+    display: block !important;  /* 顯示時用 active 類 */
+}
+
+
+
 /* QR Code 顯示區域 */
 .qr-display {
     display: flex;
@@ -177,4 +188,23 @@ body {
     .feature-icon {
         font-size: 48px;
     }
+}
+
+/* 唯讀欄位的視覺區別 */
+input[readonly] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+input[readonly]:focus {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    color: #6c757d;
+}
+
+/* 規劃功能的標籤 */
+.badge.bg-secondary {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.5rem;
 }

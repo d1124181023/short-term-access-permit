@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化有效期限天數輸入監聽
     const validityDaysInput = document.getElementById('validityDays');
+    const validityHoursInput = document.getElementById('validityHours');
+    
     if (validityDaysInput) {
         // 頁面載入時顯示一次計算結果
         updateCalculatedExpiryDate();
@@ -20,6 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
         validityDaysInput.addEventListener('change', updateCalculatedExpiryDate);
         validityDaysInput.addEventListener('input', updateCalculatedExpiryDate);
     }
+    
+    // 【新增】同步小時欄位的顯示（唯讀，自動計算）
+    if (validityHoursInput) {
+        validityDaysInput?.addEventListener('input', () => {
+            const days = parseInt(validityDaysInput.value) || 0;
+            const hours = days * 24;
+            validityHoursInput.value = hours;
+        });
+    }
 });
 
 /**
@@ -27,6 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function updateCalculatedExpiryDate() {
     const validityDaysInput = document.getElementById('validityDays');
+    const validityHoursInput = document.getElementById('validityHours');
     const calculatedDateDisplay = document.getElementById('calculatedExpiryDate');
     
     const days = parseInt(validityDaysInput.value) || 0;
@@ -34,6 +46,7 @@ function updateCalculatedExpiryDate() {
     if (days < 1 || days > 30) {
         calculatedDateDisplay.textContent = '（請輸入 1 到 30 之間的天數）';
         calculatedDateDisplay.className = 'text-danger';
+        validityHoursInput.value = 0;
         return;
     }
     
@@ -45,84 +58,90 @@ function updateCalculatedExpiryDate() {
         day: '2-digit'
     });
     
-    calculatedDateDisplay.textContent = `（截止日期：${formattedDate}）`;
+    // 【新增】同步小時欄位顯示
+    const hours = days * 24;
+    validityHoursInput.value = hours;
+    
+    calculatedDateDisplay.textContent = `（截止日期：${formattedDate}，共 ${hours} 小時）`;
     calculatedDateDisplay.className = 'text-success';
 }
 
 
 
+
 // ===== 步驟導航 =====
 function goToStep(step) {
-    // 驗證當前步驟
-    if (step === 2 && !validateStep1()) {
-        showError('請填寫完整的身分證資料');
-        return;
-    }
+    console.log('準備進到步驟', step);
     
-    if (step === 3 && !validateStep2()) {
-        showError('請填寫完整的通行資訊');
+    // 驗證當前步驟的資料
+    if (step > 1 && !validateStep1()) {
+        showError('步驟 1 資料不完整');
         return;
     }
 
-    // 保存當前步驟資料
+    if (step > 2 && !validateStep2()) {
+        showError('步驟 2 資料不完整');
+        return;
+    }
+
+    // 保存資料（步驟 1）
     if (step > 1) {
         formData.name = document.getElementById('name').value;
         formData.roc_brithday = document.getElementById('roc_birthday').value;
         formData.id_number = document.getElementById('id_number').value;
     }
 
+    // 保存資料（步驟 2）
     if (step > 2) {
         formData.pass_status = document.getElementById('pass_status').value;
         formData.pass_id = document.getElementById('pass_id').value;
         formData.validityDays = parseInt(document.getElementById('validityDays').value);
-    
-        // 驗證天數
+        formData.validityHours = parseInt(document.getElementById('validityHours').value);
+
         if (!validateValidityDays(formData.validityDays)) {
             showError('請輸入 1 到 30 之間的天數');
             return;
         }
-    
-        // 根據天數計算到期日期
+
         formData.expiryDate = calculateExpiryDate(formData.validityDays);
     }
 
+    // 移除所有指示器的 active 類
+    for (let i = 1; i <= 3; i++) {
+        const indicator = document.querySelector(`.step-indicator .step:nth-child(${i})`);
+        if (indicator) {
+            indicator.classList.remove('active');
+        }
+    }
+    
+    // 為當前步驟的指示器添加 active 類
+    const currentIndicator = document.querySelector(`.step-indicator .step:nth-child(${step})`);
+    if (currentIndicator) {
+        currentIndicator.classList.add('active');
+        console.log(`✓ 步驟指示器已更新到步驟 ${step}`);
+    }    
 
-    /**
-     * 驗證有效期限是否符合規定
-    * @param {string} expiryDate - 選擇的到期日期 (YYYY-MM-DD)
-    * @returns {boolean}
-    */
-    function validateExpiryDate(expiryDate) {
-        if (!expiryDate) return false;
-    
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-    
-        const expiry = new Date(expiryDate);
-        expiry.setHours(0, 0, 0, 0);
-    
-        // 計算天數差
-        const diffTime = expiry - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-        // 必須至少是今天或明天，最多 30 天後
-        return diffDays >= 0 && diffDays <= 30;
+    // 隱藏所有步驟內容容器
+    for (let i = 1; i <= 3; i++) {
+        const stepElement = document.getElementById(`step${i}`);
+        if (stepElement) {
+            stepElement.classList.remove('active');
+            stepElement.style.display = 'none';
+        }
     }
 
+    // 顯示指定步驟內容容器
+    const targetStep = document.getElementById(`step${step}`);
+    if (targetStep) {
+        targetStep.classList.add('active');
+        targetStep.style.display = 'block';
+        console.log(`✓ 已切換到步驟 ${step}`);
+    } else {
+        console.error(`❌ 找不到步驟容器: step${step}`);
+        return;
+    }
 
-
-    // 隱藏所有 section
-    document.getElementById('section1').style.display = 'none';
-    document.getElementById('section2').style.display = 'none';
-    document.getElementById('section3').style.display = 'none';
-
-    // 顯示目標 section
-    document.getElementById('section' + step).style.display = 'block';
-
-    // 更新步驟指示器
-    updateStepIndicator(step);
-
-    // 如果進入步驟 3，顯示摘要
+    // 如果進入步驟 3，更新摘要
     if (step === 3) {
         displaySummary();
     }
@@ -130,6 +149,7 @@ function goToStep(step) {
     // 滾動到頂部
     window.scrollTo(0, 0);
 }
+
 
 /**
  * 驗證步驟 1 的資料
@@ -156,9 +176,6 @@ function validateStep1() {
     return true;
 }
 
-/**
- * 驗證步驟 2 的資料
- */
 /**
  * 驗證步驟 2 的資料
  */
@@ -192,22 +209,6 @@ function validateStep2() {
  */
 function validateValidityDays(days) {
     return !isNaN(days) && days >= 1 && days <= 30;
-}
-
-
-
-/**
- * 更新步驟指示器的視覺狀態
- */
-function updateStepIndicator(activeStep) {
-    for (let i = 1; i <= 3; i++) {
-        const step = document.getElementById('step' + i);
-        if (i <= activeStep) {
-            step.classList.add('active');
-        } else {
-            step.classList.remove('active');
-        }
-    }
 }
 
 /**
@@ -249,6 +250,7 @@ function displaySummary() {
     
     document.getElementById('summary_pass_status').textContent = formData.pass_status;
     document.getElementById('summary_pass_id').textContent = formData.pass_id;
+    
     // 計算並顯示到期日期
     const expiryDateObj = new Date(formData.expiryDate);
     const formattedExpiryDate = expiryDateObj.toLocaleString('zh-TW', {
@@ -256,7 +258,8 @@ function displaySummary() {
         month: '2-digit',
         day: '2-digit'
     });
-    document.getElementById('summary_validity').textContent = `${formData.validityDays} 天（截止日期：${formattedExpiryDate}）`;
+    document.getElementById('summary_validity').textContent = 
+        `${formData.validityDays} 天（${formData.validityHours} 小時，截止日期：${formattedExpiryDate}）`;
 }
 
 /**
