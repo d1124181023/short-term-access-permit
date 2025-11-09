@@ -143,9 +143,13 @@ app.post('/api/issue-credential', async (req, res) => {
         const result = await response.json();
         console.log('發行端回應:', result);
 
+        // 重要：需要將沙盒 API 回傳的所有必要字段透傳給前端
+        // 包括：transactionId（用於顯示）、qrCode、deeplink 等
+
         res.json({
             success: true,
             qrCode: result.qrCode,
+            transactionId: result.transactionId,
             message: '憑證發行成功'
         });
 

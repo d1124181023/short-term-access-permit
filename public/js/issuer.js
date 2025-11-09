@@ -325,19 +325,16 @@ async function issueCredential() {
         qrcodeDiv.appendChild(img);
 }
 
-        /**new QRCode(qrcodeDiv, {
-            text: response.qrCodeUrl || JSON.stringify(credentialData),
-            width: 256,
-            height: 256,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
-        })**/
-
         // 更新成功訊息
         document.getElementById('displayPassId').textContent = formData.pass_id;
         document.getElementById('displayIssueTime').textContent = formatDateTime();
-        document.getElementById('displayVcUid').textContent = response.vcUid || '無 UID';
+        if (response.transactionId) {
+            document.getElementById('displayVcUid').textContent = response.transactionId;
+            // 儲存 transactionId 供後續使用
+            formData.transactionId = response.transactionId;
+        } else {
+            document.getElementById('displayVcUid').textContent = '待確認';
+        }
 
         // 新增至白名單
         const whitelistEntry = {
@@ -347,7 +344,8 @@ async function issueCredential() {
             pass_status: formData.pass_status,
             issue_time: formatDateTime(),
             expiry_date: formData.expiryDate,
-            status: 'active'
+            status: 'active',
+            transactionId: response.transactionId || null
         };
 
         whitelistData.push(whitelistEntry);
@@ -411,7 +409,7 @@ function updateWhitelistTable() {
     }
 
     tbody.innerHTML = activeEntries.map(entry => {
-        // 【關鍵】確保每個項目都有 ID
+        // 確保每個項目都有 ID
         if (!entry.id) {
             console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
             entry.id = Date.now() + Math.random();  // 產生唯一 ID
@@ -530,7 +528,7 @@ function loadWhitelist() {
             if (response.success && response.data) {
                 console.log('✓ 從後端載入白名單，共', response.data.length, '筆');
                 
-                // 【關鍵】合併資料而不是覆蓋
+                // 合併資料而不是覆蓋
                 // 保留 localStorage 中的舊資料，加入後端的新資料
                 const mergedData = mergeWhitelistData(whitelistData, response.data);
                 
@@ -579,26 +577,49 @@ function mergeWhitelistData(localData, remoteData) {
  * 重新開始
  */
 function resetForm() {
-    formData = {};
-    
-    // 重置表單
-    document.getElementById('idForm').reset();
-    document.getElementById('accessForm').reset();
-    
-    // 隱藏所有 section，顯示第一個
-    document.getElementById('section1').style.display = 'block';
-    document.getElementById('section2').style.display = 'none';
-    document.getElementById('section3').style.display = 'none';
-    
-    // 隱藏 QR Code 和錯誤訊息
-    document.getElementById('qrcodeContainer').style.display = 'none';
-    document.getElementById('errorContainer').style.display = 'none';
-    document.getElementById('prevBtn').style.display = 'inline-block';
-    
-    // 重置步驟指示器
-    updateStepIndicator(1);
-    
-    window.scrollTo(0, 0);
+    try {
+        console.log('重新開始表單');
+        
+        // 嘗試找表單
+        let form = document.getElementById('issuerForm');
+        if (!form) {
+            form = document.querySelector('form');
+        }
+        
+        // 重置表單
+        if (form && typeof form.reset === 'function') {
+            form.reset();
+            console.log('✓ 表單已重置');
+        } else {
+            // 手動清空所有欄位
+            document.getElementById('name').value = '';
+            document.getElementById('roc_birthday').value = '';
+            document.getElementById('id_number').value = '';
+            document.getElementById('pass_status').value = '';
+            document.getElementById('pass_id').value = '';
+            document.getElementById('validityDays').value = '3';
+            document.getElementById('validityHours').value = '72';
+        }
+        
+        // 清空 formData
+        formData = {};
+        
+        // 隱藏 QR Code 和錯誤
+        document.getElementById('qrcodeContainer').style.display = 'none';
+        document.getElementById('errorContainer').style.display = 'none';
+        document.getElementById('prevBtn').style.display = 'inline-block';
+        
+        // 返回步驟 1
+        goToStep(1);
+        
+        console.log('✓ 已重新開始');
+        showSuccess('已重新開始表單');
+        
+    } catch (error) {
+        console.error('❌ 重新開始表單時出錯:', error);
+        showError('重新開始失敗，請刷新頁面');
+    }
 }
+
 
 console.log('發行端 JavaScript 已載入');
