@@ -398,7 +398,6 @@ function updateWhitelistTable() {
     // 確保白名單資料有效
     if (!whitelistData || !Array.isArray(whitelistData)) {
         console.error('❌ whitelistData 無效');
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">資料載入失敗</td></tr>';
         return;
     }
     
@@ -411,82 +410,126 @@ function updateWhitelistTable() {
     
     if (activeEntries.length < whitelistData.length) {
         const removedCount = whitelistData.length - activeEntries.length;
-        whitelistData = activeEntries;
-        saveToStorage('whitelist', whitelistData);
-        console.log(`✓ 自動清理 ${removedCount} 筆過期白名單項目`);
+        console.log(`⚠️  已過期的項目 ${removedCount} 筆，已從表格中移除`);
     }
     
-    if (activeEntries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">目前尚無發行紀錄或全部已過期</td></tr>';
-        return;
-    }
-
+    // 清空舊內容（安全方式）
     while (tbody.firstChild) {
         tbody.removeChild(tbody.firstChild);
     }
-
+    
+    // 如果沒有有效項目
+    if (activeEntries.length === 0) {
+        const emptyRow = document.createElement('tr');
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 7;
+        emptyCell.textContent = '暫無有效的白名單項目';
+        emptyCell.style.textAlign = 'center';
+        emptyCell.style.color = '#999';
+        emptyRow.appendChild(emptyCell);
+        tbody.appendChild(emptyRow);
+        return;
+    }
+    
     // 使用文檔片段提高性能
     const fragment = document.createDocumentFragment();
-
+    
     activeEntries.forEach(entry => {
-    // 確保每個項目都有 ID
-    if (!entry.id) {
-        console.warn('項目缺少 ID，自動生成:', entry);
-        const randomArray = new Uint8Array(8);
-        crypto.getRandomValues(randomArray);
-        const randomId = Array.from(randomArray).map(b => b.toString(16).padStart(2, '0')).join('');
-        entry.id = parseInt(Date.now().toString() + randomId, 10);
-    }
-    
-    const issueTime = entry.issue_time || formatDateTime();
-    const expiryDateStr = entry.expiry_date || '未設定';
-    
-    const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
-    const now = new Date();
-    const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
-    
-    let statusBadgeClass = 'bg-success';
-    let statusText = entry.status;
-    
-    if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
-        statusBadgeClass = 'bg-warning text-dark';
-        statusText = `即將到期 (${daysUntilExpiry}天)`;
-    } else if (daysUntilExpiry < 0) {
-        statusBadgeClass = 'bg-danger';
-        statusText = '已過期';
-    }
-    
-    // 建立 <tr> 元素
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td class="text-monospace small">${entry.pass_id}</td>
-        <td>${entry.name}</td>
-        <td>${entry.pass_status}</td>
-        <td><small>${issueTime}</small></td>
-        <td><small>${expiryDateStr}</small></td>
-        <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
-        <td>
-            <button class="btn btn-sm btn-danger" 
-                    title="取消此人員的通行權限"
-                    data-id="${entry.id}"
-                    style="padding: 2px 6px; font-size: 0.8rem;">
-                ✕
-            </button>
-        </td>
-    `;
-    
-    // 添加事件監聽器（而不是 onclick）
-    const btn = tr.querySelector('button');
-    btn.addEventListener('click', () => {
-        removeWhitelistEntry(entry.id, entry.name);
-    });    
+        // 確保每個項目都有 ID
+        if (!entry.id) {
+            console.warn('項目缺少 ID，自動生成:', entry);
+            const randomArray = new Uint8Array(8);
+            crypto.getRandomValues(randomArray);
+            const randomId = Array.from(randomArray).map(b => b.toString(16).padStart(2, '0')).join('');
+            entry.id = parseInt(Date.now().toString() + randomId, 10);
+        }
+        
+        const issueTime = entry.issue_time || formatDateTime();
+        const expiryDateStr = entry.expiry_date || '未設定';
+        
+        const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
+        const now = new Date();
+        const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
+        
+        let statusBadgeClass = 'bg-success';
+        let statusText = entry.status;
+        
+        if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
+            statusBadgeClass = 'bg-warning text-dark';
+            statusText = `即將到期 (${daysUntilExpiry}天)`;
+        } else if (daysUntilExpiry < 0) {
+            statusBadgeClass = 'bg-danger';
+            statusText = '已過期';
+        }        
+        // 建立 <tr> 元素
+        const tr = document.createElement('tr');
+        
+        // 1. pass_id 列
+        const passIdTd = document.createElement('td');
+        passIdTd.className = 'text-monospace small';
+        passIdTd.textContent = entry.pass_id;
+        tr.appendChild(passIdTd);
+        
+        // 2. name 列
+        const nameTd = document.createElement('td');
+        nameTd.textContent = entry.name;
+        tr.appendChild(nameTd);
+        
+        // 3. pass_status 列
+        const statusTd = document.createElement('td');
+        statusTd.textContent = entry.pass_status;
+        tr.appendChild(statusTd);
+        
+        // 4. issue_time 列（帶 <small> 標籤）
+        const issueTimeTd = document.createElement('td');
+        const issueTimeSmall = document.createElement('small');
+        issueTimeSmall.textContent = issueTime;
+        issueTimeTd.appendChild(issueTimeSmall);
+        tr.appendChild(issueTimeTd);
+        
+        // 5. expiry_date 列（帶 <small> 標籤）
+        const expiryTd = document.createElement('td');
+        const expirySmall = document.createElement('small');
+        expirySmall.textContent = expiryDateStr;
+        expiryTd.appendChild(expirySmall);
+        tr.appendChild(expiryTd);
+        
+        // 6. status badge 列
+        const statusBadgeTd = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = `badge ${statusBadgeClass}`;
+        badge.textContent = statusText;
+        statusBadgeTd.appendChild(badge);
+        tr.appendChild(statusBadgeTd);
+        
+        // 7. 刪除按鈕列
+        const buttonTd = document.createElement('td');
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm btn-danger';
+        button.title = '取消此人員的通行權限';
+        button.setAttribute('data-id', entry.id);
+        button.style.padding = '2px 6px';
+        button.style.fontSize = '0.8rem';
+        button.textContent = '✕';
+        
+        // 添加點擊事件監聽器（安全且易於維護）
+        button.addEventListener('click', () => {
+            removeWhitelistEntry(entry.id, entry.name);
+        });
+        
+        buttonTd.appendChild(button);
+        tr.appendChild(buttonTd);
+        
+        // ===== 完成一行的建立 =====
+        
+        // 添加行到 fragment
         fragment.appendChild(tr);
     });
-
-    // 一次性添加所有元素到 DOM
+    
+    // 一次性添加所有元素到 DOM（提高性能）
     tbody.appendChild(fragment);
     
-    console.log('✓ 白名單表格已更新');
+    console.log('✓ 白名單表格已更新，共 ' + activeEntries.length + ' 筆有效項目');
 }
 
 
