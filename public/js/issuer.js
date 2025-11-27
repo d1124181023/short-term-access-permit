@@ -314,7 +314,7 @@ async function issueCredential() {
         // 顯示 QR Code
         if (response.success && response.qrCode) {
          const qrcodeDiv = document.getElementById('qrcode');
-         
+
          // 安全地清空舊內容
          while (qrcodeDiv.firstChild) {
              qrcodeDiv.removeChild(qrcodeDiv.firstChild);
@@ -421,54 +421,70 @@ function updateWhitelistTable() {
         return;
     }
 
-    tbody.innerHTML = activeEntries.map(entry => {
-        // 確保每個項目都有 ID
-        if (!entry.id) {
-            console.warn('項目缺少 ID，自動生成:', entry);
-            const randomArray = new Uint8Array(8);
-            crypto.getRandomValues(randomArray);
-            const randomId = Array.from(randomArray).map(b => b.toString(16).padStart(2, '0')).join('');
-            entry.id = parseInt(Date.now().toString() + randomId, 10);
-        }
-        
-        const issueTime = entry.issue_time || formatDateTime();
-        const expiryDateStr = entry.expiry_date || '未設定';
-        
-        const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
-        const now = new Date();
-        const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
-        
-        let statusBadgeClass = 'bg-success';
-        let statusText = entry.status;
-        
-        if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
-            statusBadgeClass = 'bg-warning text-dark';
-            statusText = `即將到期 (${daysUntilExpiry}天)`;
-        } else if (daysUntilExpiry < 0) {
-            statusBadgeClass = 'bg-danger';
-            statusText = '已過期';
-        }
-        
-        return `
-            <tr>
-                <td class="text-monospace small">${entry.pass_id}</td>
-                <td>${entry.name}</td>
-                <td>${entry.pass_status}</td>
-                <td><small>${issueTime}</small></td>
-                <td><small>${expiryDateStr}</small></td>
-                <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
-                <td>
-                    <button class="btn btn-sm btn-danger" 
-                            onclick="removeWhitelistEntry(${entry.id}, '${entry.name}')"
-                            title="取消此人員的通行權限"
-                            data-id="${entry.id}"
-                            style="padding: 2px 6px; font-size: 0.8rem;">
-                        ✕
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    while (tbody.firstChild) {
+        tbody.removeChild(tbody.firstChild);
+    }
+
+    // 使用文檔片段提高性能
+    const fragment = document.createDocumentFragment();
+
+    activeEntries.forEach(entry => {
+    // 確保每個項目都有 ID
+    if (!entry.id) {
+        console.warn('項目缺少 ID，自動生成:', entry);
+        const randomArray = new Uint8Array(8);
+        crypto.getRandomValues(randomArray);
+        const randomId = Array.from(randomArray).map(b => b.toString(16).padStart(2, '0')).join('');
+        entry.id = parseInt(Date.now().toString() + randomId, 10);
+    }
+    
+    const issueTime = entry.issue_time || formatDateTime();
+    const expiryDateStr = entry.expiry_date || '未設定';
+    
+    const expiryDate = entry.expiry_date ? new Date(entry.expiry_date) : null;
+    const now = new Date();
+    const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)) : -1;
+    
+    let statusBadgeClass = 'bg-success';
+    let statusText = entry.status;
+    
+    if (daysUntilExpiry >= 0 && daysUntilExpiry <= 1) {
+        statusBadgeClass = 'bg-warning text-dark';
+        statusText = `即將到期 (${daysUntilExpiry}天)`;
+    } else if (daysUntilExpiry < 0) {
+        statusBadgeClass = 'bg-danger';
+        statusText = '已過期';
+    }
+    
+    // 建立 <tr> 元素
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="text-monospace small">${entry.pass_id}</td>
+        <td>${entry.name}</td>
+        <td>${entry.pass_status}</td>
+        <td><small>${issueTime}</small></td>
+        <td><small>${expiryDateStr}</small></td>
+        <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
+        <td>
+            <button class="btn btn-sm btn-danger" 
+                    title="取消此人員的通行權限"
+                    data-id="${entry.id}"
+                    style="padding: 2px 6px; font-size: 0.8rem;">
+                ✕
+            </button>
+        </td>
+    `;
+    
+    // 添加事件監聽器（而不是 onclick）
+    const btn = tr.querySelector('button');
+    btn.addEventListener('click', () => {
+        removeWhitelistEntry(entry.id, entry.name);
+    });    
+        fragment.appendChild(tr);
+    });
+
+    // 一次性添加所有元素到 DOM
+    tbody.appendChild(fragment);
     
     console.log('✓ 白名單表格已更新');
 }
