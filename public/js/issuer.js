@@ -336,9 +336,18 @@ async function issueCredential() {
             document.getElementById('displayVcUid').textContent = '待確認';
         }
 
+        function generateUUIDv4() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = crypto.getRandomValues(new Uint8Array(1)) % 16;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        }
+
+        const uuid = generateUUIDv4();
         // 新增至白名單
         const whitelistEntry = {
-            id: Date.now(),  // ← 確保有 ID
+            id: Date.now().toString() + uuid.replace(/-/g, ''),
             pass_id: formData.pass_id,
             name: formData.name,
             pass_status: formData.pass_status,
@@ -411,8 +420,11 @@ function updateWhitelistTable() {
     tbody.innerHTML = activeEntries.map(entry => {
         // 確保每個項目都有 ID
         if (!entry.id) {
-            console.warn('⚠️ 項目缺少 ID，自動生成:', entry);
-            entry.id = Date.now() + Math.random();  // 產生唯一 ID
+            console.warn('項目缺少 ID，自動生成:', entry);
+            const randomArray = new Uint8Array(8);
+            crypto.getRandomValues(randomArray);
+            const randomId = Array.from(randomArray).map(b => b.toString(16).padStart(2, '0')).join('');
+            entry.id = parseInt(Date.now().toString() + randomId, 10);
         }
         
         const issueTime = entry.issue_time || formatDateTime();

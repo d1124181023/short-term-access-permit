@@ -4,6 +4,8 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const https = require('https'); 
+const crypto = require('crypto');
 
 // 建立 Express 應用程式
 const app = express();
@@ -83,12 +85,12 @@ setInterval(cleanupExpiredWhitelist, 60 * 60 * 1000);
 // 工具函數：生成交易序號 (UUID v4)
 // ============================================
 
-function generateTransactionId() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+function generateTransactionId() {  
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = crypto.randomBytes(1)[0] % 16;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 // ============================================
@@ -519,12 +521,38 @@ app.post('/api/verify-whitelist', (req, res) => {
 });
 
 // ============================================
-// 啟動伺服器
+// 啟動伺服器（支持 HTTP 和 HTTPS）
 // ============================================
 
-app.listen(PORT, () => {
+// 優先使用 HTTPS（如果 .env 配置了憑證路徑）
+if (fs.existsSync('certs/cert.pem') && fs.existsSync('certs/key.pem')){
+  try {
+    const cert = fs.readFileSync('certs/cert.pem', 'utf8');
+    const key = fs.readFileSync('certs/key.pem', 'utf8');
+    https.createServer({ key, cert }, app).listen(443, () => {
+        console.log('=================================');
+        console.log('🔒 HTTPS 伺服器已啟動！');
+        console.log('網址: https://localhost:443');
+        console.log('或者: https://localhost');
+        console.log('=================================');
+    });
+  } catch (error) {
+    console.error('❌ SSL 憑證載入失敗，改用 HTTP:', error.message);
+    app.listen(PORT, () => {
+      console.log(`=================================`);
+      console.log(`伺服器已啟動（HTTP - 開發模式）`);
+      console.log(`網址: http://localhost:${PORT}`);
+      console.log(`⚠️  警告：生產環境應使用 HTTPS`);
+      console.log(`=================================`);
+    });
+  }
+} else {
+  // 開發環境或無 SSL 憑證時使用 HTTP
+  app.listen(PORT, () => {
     console.log(`=================================`);
-    console.log(`伺服器已啟動！`);
+    console.log(`伺服器已啟動（HTTP - 開發模式）`);
     console.log(`網址: http://localhost:${PORT}`);
+    console.log(`⚠️  警告：生產環境應使用 HTTPS`);
     console.log(`=================================`);
-});
+  });
+}

@@ -138,29 +138,38 @@ function rocToWestern(rocBirthday) {
  * @returns {string} 格式：ACC20251104000001
  */
 function generateUniquePassId() {
-    const prefix = 'ACC';
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
-    
-    // 產生更長的亂數（6碼，範圍 000000-999999）
-    const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-    const passId = `${prefix}${date}${randomNum}`;
-    
-    // 儲存到 localStorage 的已生成編號清單，用來檢查重複
-    let generatedIds = getFromStorage('generatedPassIds') || [];
-    
-    // 如果產生重複，遞迴重新產生
-    if (generatedIds.includes(passId)) {
-        console.warn('通行編號重複，重新生成...');
-        return generateUniquePassId();
-    }
-    
-    // 加入已生成清單
-    generatedIds.push(passId);
-    saveToStorage('generatedPassIds', generatedIds);
-    
-    console.log('✓ 通行編號已產生並記錄:', passId);
-    return passId;
+  const prefix = 'ACC';
+  const date = new Date().toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+
+  // 前端使用 crypto.getRandomValues()
+  const array = new Uint8Array(3);
+  crypto.getRandomValues(array);
+  
+  // 將 3 個字節轉為 0-999999 的數字
+  const randomNum = (
+    (array[0] << 16) | (array[1] << 8) | array[2]
+  ) % 1000000;
+  
+  const randomNumStr = randomNum.toString().padStart(6, '0');
+  const passId = `${prefix}${date}${randomNumStr}`;
+
+  // 儲存到 localStorage 的已生成編號清單，用來檢查重複
+  let generatedIds = getFromStorage('generatedPassIds') || [];
+
+  // 如果產生重複，遞迴重新產生
+  if (generatedIds.includes(passId)) {
+    console.warn('通行編號重複，重新生成...');
+    return generateUniquePassId();
+  }
+
+  // 加入已生成清單
+  generatedIds.push(passId);
+  saveToStorage('generatedPassIds', generatedIds);
+  console.log('✓ 通行編號已產生並記錄:', passId);
+  return passId;
 }
+
+
 
 /**
  * 清除過期的通行編號記錄（可定期呼叫）
@@ -283,12 +292,15 @@ function showError(message) {
  * @returns {string} UUID v4 格式（36 字元）
  */
 function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const randomArray = new Uint8Array(1);
+    crypto.getRandomValues(randomArray);
+    const r = randomArray[0] % 16;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
+
 
 /**
  * 驗證交易序號格式
