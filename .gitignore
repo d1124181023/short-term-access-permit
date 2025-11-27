@@ -147,3 +147,22 @@ whitelist.json
 # Node modules
 node_modules/
 
+# ====================================
+# 項目特定文件（Short-term VC System）
+# ====================================
+
+# SSL 憑證（開發用）
+certs/
+*.pem
+*.key
+
+# 運行時生成的日誌
+verification-logs.json
+
+# npm 鎖文件
+package-lock.json
+yarn.lock
+
+# IDE 配置
+.vscode/
+.idea/
