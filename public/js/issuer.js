@@ -314,7 +314,11 @@ async function issueCredential() {
         // 顯示 QR Code
         if (response.success && response.qrCode) {
          const qrcodeDiv = document.getElementById('qrcode');
-         qrcodeDiv.innerHTML = ''; // 清空
+         
+         // 安全地清空舊內容
+         while (qrcodeDiv.firstChild) {
+             qrcodeDiv.removeChild(qrcodeDiv.firstChild);
+         }
 
         // 直接顯示 API 回傳的 base64 QR Code
         const img = document.createElement('img');
