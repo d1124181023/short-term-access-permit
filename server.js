@@ -524,35 +524,81 @@ app.post('/api/verify-whitelist', (req, res) => {
 // 啟動伺服器（支持 HTTP 和 HTTPS）
 // ============================================
 
-// 優先使用 HTTPS（如果 .env 配置了憑證路徑）
-if (fs.existsSync('certs/cert.pem') && fs.existsSync('certs/key.pem')){
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (fs.existsSync('certs/cert.pem') && fs.existsSync('certs/key.pem')) {
   try {
     const cert = fs.readFileSync('certs/cert.pem', 'utf8');
     const key = fs.readFileSync('certs/key.pem', 'utf8');
-    https.createServer({ key, cert }, app).listen(443, () => {
-        console.log('=================================');
-        console.log('🔒 HTTPS 伺服器已啟動！');
-        console.log('網址: https://localhost:443');
-        console.log('或者: https://localhost');
-        console.log('=================================');
+    
+    // 指定明確的 TLS 版本
+    https.createServer(
+      {
+        key: key,
+        cert: cert,
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.3'
+      },
+      app
+    ).listen(443, () => {
+      console.log('=================================');
+      console.log('🔒 HTTPS 伺服器已啟動！');
+      console.log('網址: https://localhost:443');
+      console.log('或者: https://localhost');
+      console.log('=================================');
     });
+    
+    // 在生產環境下不啟動 HTTP，防止不安全的流量
+    if (!isProduction) {
+      // 開發環境：同時啟動 HTTP 用於測試，但顯示警告
+      app.listen(PORT, () => {
+        console.log('=================================');
+        console.log(`⚠️  HTTP 伺服器已啟動（開發模式）`);
+        console.log(`網址: http://localhost:${PORT}`);
+        console.log('注意：這是開發環境，生產環境必須使用 HTTPS');
+        console.log('=================================');
+      });
+    }
+    
   } catch (error) {
-    console.error('❌ SSL 憑證載入失敗，改用 HTTP:', error.message);
-    app.listen(PORT, () => {
-      console.log(`=================================`);
-      console.log(`伺服器已啟動（HTTP - 開發模式）`);
-      console.log(`網址: http://localhost:${PORT}`);
-      console.log(`⚠️  警告：生產環境應使用 HTTPS`);
-      console.log(`=================================`);
-    });
+    console.error('❌ SSL 憑證載入失敗:', error.message);
+    
+    // 憑證載入失敗的處理邏輯
+    if (isProduction) {
+      // 生產環境：憑證載入失敗應該直接退出
+      console.error('🚨 生產環境必須使用有效的 SSL 憑證！');
+      console.error('請確保以下文件存在且有效：');
+      console.error('  - certs/cert.pem');
+      console.error('  - certs/key.pem');
+      process.exit(1);
+    } else {
+      // 開發環境：允許降級到 HTTP，但顯示警告
+      console.warn('ℹ️  開發環境：降級為 HTTP（生產環境必須使用 HTTPS）');
+      app.listen(PORT, () => {
+        console.log('=================================');
+        console.log(`伺服器已啟動（HTTP - 開發模式）`);
+        console.log(`網址: http://localhost:${PORT}`);
+        console.log('⚠️  警告：生產環境應使用 HTTPS');
+        console.log('=================================');
+      });
+    }
   }
 } else {
-  // 開發環境或無 SSL 憑證時使用 HTTP
-  app.listen(PORT, () => {
-    console.log(`=================================`);
-    console.log(`伺服器已啟動（HTTP - 開發模式）`);
-    console.log(`網址: http://localhost:${PORT}`);
-    console.log(`⚠️  警告：生產環境應使用 HTTPS`);
-    console.log(`=================================`);
-  });
+  // SSL 憑證不存在的處理
+  if (isProduction) {
+    console.error('🚨 生產環境必須使用 SSL 憑證！');
+    console.error('請先生成 SSL 憑證：');
+    console.error('  node generate-cert.js');
+    process.exit(1);
+  } else {
+    // 開發環境：允許使用 HTTP
+    app.listen(PORT, () => {
+      console.log('=================================');
+      console.log(`伺服器已啟動（HTTP - 開發模式）`);
+      console.log(`網址: http://localhost:${PORT}`);
+      console.log('⚠️  警告：生產環境應使用 HTTPS');
+      console.log('提示：生成 SSL 憑證請執行: node generate-cert.js');
+      console.log('=================================');
+    });
+  }
 }
