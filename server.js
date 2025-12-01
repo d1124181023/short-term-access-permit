@@ -521,84 +521,59 @@ app.post('/api/verify-whitelist', (req, res) => {
 });
 
 // ============================================
-// 啟動伺服器（支持 HTTP 和 HTTPS）
+// 啟動伺服器 - 強制使用 HTTPS
 // ============================================
 
-const isProduction = process.env.NODE_ENV === 'production';
+/**
+ * - 所有環境都必須使用 HTTPS
+ * - 生產環境：必須有有效的 SSL 憑證
+ * - 開發環境：使用自簽 SSL 憑證（自動生成）
+ * - 如果找不到憑證，直接退出（不降級到 HTTP）
+ */
 
-if (fs.existsSync('certs/cert.pem') && fs.existsSync('certs/key.pem')) {
-  try {
-    const cert = fs.readFileSync('certs/cert.pem', 'utf8');
-    const key = fs.readFileSync('certs/key.pem', 'utf8');
-    
-    // 指定明確的 TLS 版本
-    https.createServer(
-      {
-        key: key,
-        cert: cert,
-        minVersion: 'TLSv1.2',
-        maxVersion: 'TLSv1.3'
-      },
-      app
-    ).listen(443, () => {
-      console.log('=================================');
-      console.log('🔒 HTTPS 伺服器已啟動！');
-      console.log('網址: https://localhost:443');
-      console.log('或者: https://localhost');
-      console.log('=================================');
-    });
-    
-    // 在生產環境下不啟動 HTTP，防止不安全的流量
-    if (!isProduction) {
-      // 開發環境：同時啟動 HTTP 用於測試，但顯示警告
-      app.listen(PORT, () => {
-        console.log('=================================');
-        console.log(`⚠️  HTTP 伺服器已啟動（開發模式）`);
-        console.log(`網址: http://localhost:${PORT}`);
-        console.log('注意：這是開發環境，生產環境必須使用 HTTPS');
-        console.log('=================================');
-      });
-    }
-    
-  } catch (error) {
-    console.error('❌ SSL 憑證載入失敗:', error.message);
-    
-    // 憑證載入失敗的處理邏輯
-    if (isProduction) {
-      // 生產環境：憑證載入失敗應該直接退出
-      console.error('🚨 生產環境必須使用有效的 SSL 憑證！');
-      console.error('請確保以下文件存在且有效：');
-      console.error('  - certs/cert.pem');
-      console.error('  - certs/key.pem');
-      process.exit(1);
-    } else {
-      // 開發環境：允許降級到 HTTP，但顯示警告
-      console.warn('ℹ️  開發環境：降級為 HTTP（生產環境必須使用 HTTPS）');
-      app.listen(PORT, () => {
-        console.log('=================================');
-        console.log(`伺服器已啟動（HTTP - 開發模式）`);
-        console.log(`網址: http://localhost:${PORT}`);
-        console.log('⚠️  警告：生產環境應使用 HTTPS');
-        console.log('=================================');
-      });
-    }
-  }
-} else {
-  // SSL 憑證不存在的處理
-  if (isProduction) {
-    console.error('🚨 生產環境必須使用 SSL 憑證！');
-    console.error('請先生成 SSL 憑證：');
-    console.error('  node generate-cert.js');
-    process.exit(1);
-  } else {
-    // 開發環境：允許使用 HTTP
-    app.listen(PORT, () => {
-      console.log('=================================');
-      console.log(`伺服器已啟動（HTTP - 開發模式）`);
-      console.log(`網址: http://localhost:${PORT}`);
-      console.log('⚠️  警告：生產環境應使用 HTTPS');
-      console.log('提示：生成 SSL 憑證請執行: node generate-cert.js');
-      console.log('=================================');
-    });
-  }
+// 確保憑證存在
+if (!fs.existsSync('certs/cert.pem') || !fs.existsSync('certs/key.pem')) {
+  console.error('╔═════════════════════════════════════════════╗');
+  console.error('║ 🚨 HTTPS 憑證不存在！                       ║');
+  console.error('║                                             ║');
+  console.error('║ 請執行以下指令生成自簽憑證：               ║');
+  console.error('║   node generate-cert.js                     ║');
+  console.error('║                                             ║');
+  console.error('║ 並重新啟動伺服器                          ║');
+  console.error('╚═════════════════════════════════════════════╝');
+  process.exit(1);
+}
+
+try {
+  const cert = fs.readFileSync('certs/cert.pem', 'utf8');
+  const key = fs.readFileSync('certs/key.pem', 'utf8');
+  
+  // 指定安全的 TLS 版本，強制 TLS 1.2+
+  https.createServer(
+    {
+      key: key,
+      cert: cert,
+      minVersion: 'TLSv1.2',      // 最低版本 TLS 1.2
+      maxVersion: 'TLSv1.3'        // 最高版本 TLS 1.3
+    },
+    app
+  ).listen(443, () => {
+    console.log('HTTPS 伺服器已成功啟動！');
+    console.log('安全協議：TLS 1.2 - TLS 1.3');
+    console.log('監聽位址：');
+    console.log('https://localhost:443');
+    console.log('或 https://localhost');
+    console.log('注意：使用自簽憑證，瀏覽器會警告');
+    console.log('在開發環境中，點擊「繼續」或「接受風險」');
+  });
+  
+} catch (error) {
+  console.error('SSL 憑證載入失敗！');
+  console.error('錯誤訊息：' + error.message);
+  console.error('排查步驟：');
+  console.error('1. 檢查 certs/cert.pem 是否存在');
+  console.error('2. 檢查 certs/key.pem 是否存在');
+  console.error('3. 檔案權限是否正確');
+  console.error('4. 重新生成憑證：node generate-cert.js');
+  process.exit(1);
 }

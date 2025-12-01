@@ -27,6 +27,6 @@ if (!fs.existsSync('certs')) {
 fs.writeFileSync('certs/cert.pem', pems.cert);
 fs.writeFileSync('certs/key.pem', pems.private);
 
-console.log('✅ SSL 憑證已生成！');
+console.log('SSL 憑證已生成！');
 console.log('   📁 certs/cert.pem');
 console.log('   📁 certs/key.pem');
